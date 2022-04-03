@@ -1,0 +1,52 @@
+on:
+  push:
+     branches:
+       - main
+  schedule:
+    - cron:  '0 3 * * *' 
+
+name: danish-electricity-prices-render
+
+jobs:
+  bookdown:
+    name: renderbook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: r-lib/actions/setup-r@v1
+      - name: Render Book from Action
+        uses: ckrusemd/rmarkdown-action@v0.18
+        with:
+           input_file: index.Rmd
+      - name: Cache R packages
+        if: runner.os != 'Windows'
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-${{ hashFiles('DESCRIPTION') }}
+      - uses: actions/upload-artifact@v1
+        with:
+          name: _book
+          path: _book/
+
+  checkout-and-deploy:
+    runs-on: ubuntu-latest
+    needs: bookdown
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: _book # optional
+        path: _book # optional
+    - name: Deploy to GitHub Pages
+      uses: Cecilapp/GitHub-Pages-deploy@v3
+      with:
+        build_dir: _book/
+        email: ${{ secrets.EMAIL }}  #optional
+        jekyll: no                     # optional
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        EMAIL: ${{ secrets.EMAIL }}
+        BUILD_DIR: _book/
