@@ -5,9 +5,8 @@ date: "3/26/2022"
 output: html_document
 ---
 
-
 # East Denmark
-
+ 
 ```{r echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE,message = FALSE,warning = FALSE)
 library(pacman)
@@ -18,12 +17,9 @@ pacman::p_load(tidyr,
                lubridate)
 ```
 
-
-## Price Forecast
-
 ```{r}
 
-api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 15000'
+api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 20000'
 api_url = utils::URLencode(api_url)
 api_result = httr::GET(api_url)
 api_json = rawToChar(api_result$content)
@@ -56,10 +52,15 @@ df %>%
   geom_line() +
   geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK,color=Cheap),size=2) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
-  scale_y_continuous(limits=c(0,NA)) +
+  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
-  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) 
+  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  labs(title="Lowest Upcoming Prices",
+       subtitle="East Denmark",
+       x="Hour",
+       y="Price (DKK)") +
+  theme(legend.position="null")
 
 
 ```
@@ -81,7 +82,12 @@ df %>%
   scale_x_datetime(date_breaks = "1 day",date_labels = "%b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
   theme_bw() +
-  geom_text(aes(label=scales::number(SpotPriceDKK,accuracy = 0.01)))
+  geom_text(aes(label=scales::number(SpotPriceDKK,accuracy = 0.01)))  +
+  labs(title="Previous Week and Upcoming Prices",
+       subtitle="East Denmark",
+       x="Day",
+       y="Hour") +
+  theme(legend.position="null")
 ```
 
 
@@ -106,11 +112,16 @@ df %>%
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
   geom_line() +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  scale_y_continuous(limits=c(0,NA)) +
+  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
-  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA)
+  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA)  +
+  labs(title="Previous Week and Upcoming Prices",
+       subtitle="East Denmark w/ 95% CI",
+       x="Day",
+       y="Price (DKK)") +
+  theme(legend.position="null")
 
 ```
 
@@ -130,7 +141,12 @@ df %>%
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "7 day",date_labels = "%b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
-  theme_bw()
+  theme_bw()  +
+  labs(title="Previous Month and Upcoming Prices",
+       subtitle="East Denmark",
+       x="Day",
+       y="Hour") +
+  theme(legend.position="null")
 ```
 
 ```{r}
@@ -154,11 +170,16 @@ df %>%
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
   geom_line() +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  scale_y_continuous(limits=c(0,NA)) +
+  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
-  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA)
+  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA) +
+  labs(title="Previous Month and Upcoming Prices",
+       subtitle="East Denmark, with 95% CI",
+       x="Day",
+       y="Price (DKK)") +
+  theme(legend.position="null")
 
 ```
 
@@ -173,7 +194,8 @@ lwr_upr = df %>%
   filter(HourDK >= min_forecast_day) %>% 
   dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
   filter(SpotPriceDKK_z<=qnorm(p = 0.975) | SpotPriceDKK_z<=qnorm(p = 0.025)) %>% 
-  dplyr::summarise(lwr=min(SpotPriceDKK),upr=max(SpotPriceDKK))
+  dplyr::summarise(lwr=min(SpotPriceDKK),upr=max(SpotPriceDKK)) %>% 
+  dplyr::mutate(lwr=ifelse(lwr<0,0,lwr))
 
 lwr_upr_date = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
@@ -184,12 +206,18 @@ df %>%
   filter(HourDK >= min_forecast_day) %>% 
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
   geom_line() +
+  geom_smooth() +
   scale_x_datetime(date_breaks = "1 month",date_labels = "%b") +
-  scale_y_continuous(limits=c(0,NA)) +
+  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
-  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA)
+  geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA) +
+  labs(title="Previous Years and Upcoming Prices",
+       subtitle="East Denmark, with 95% CI",
+       x="Month",
+       y="Price (DKK)") +
+  theme(legend.position="null")
 
 ```
 
