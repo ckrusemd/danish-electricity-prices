@@ -1,0 +1,13 @@
+danish-electricity-prices
+east-denmark
+price-forecast
+best-upcoming
+last-week-upcoming
+last-month-upcoming
+all-time
+west-denmark
+price-forecast-1
+best-upcoming-1
+last-week-upcoming-1
+last-month-upcoming-1
+all-time-1
