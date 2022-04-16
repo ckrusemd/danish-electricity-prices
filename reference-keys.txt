@@ -1,11 +1,14 @@
 danish-electricity-prices
 east-denmark
 best-upcoming
-last-week-upcoming
+best-two-hour-window
+best-three-hour-window
 last-month-upcoming
 all-time
 west-denmark
 best-upcoming-1
-last-week-upcoming-1
+best-two-hour-window-1
+best-three-hour-window-1
+last-week-upcoming
 last-month-upcoming-1
 all-time-1
