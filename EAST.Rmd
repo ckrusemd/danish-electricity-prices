@@ -19,7 +19,7 @@ pacman::p_load(tidyr,
 
 ```{r}
 
-api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 20000'
+api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 30000'
 api_url = utils::URLencode(api_url)
 api_result = httr::GET(api_url)
 api_json = rawToChar(api_result$content)
@@ -65,6 +65,75 @@ df %>%
 
 ```
 
+## Best Two-Hour Window
+
+```{r}
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = Sys.time()
+
+max_forecast_day
+
+df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1))/2) %>% 
+  filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
+  filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
+  dplyr::mutate(HourDK=format(HourDK,"%H:%M"),
+                Next_Two_Hours=scales::number(Next_Three_Hours,accuracy=0.01)) %>% 
+  dplyr::select(HourDK,Next_Two_Hours) %>% 
+  knitr::kable()
+```
+
+## Best Three-Hour Window
+
+```{r}
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = Sys.time()
+
+max_forecast_day
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = Sys.time()
+
+max_forecast_day
+
+df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1)+lead(SpotPriceDKK,n=2))/3) %>% 
+  filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
+  filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
+  dplyr::mutate(HourDK=format(HourDK,"%H:%M"),
+                Next_Three_Hours=scales::number(Next_Three_Hours,accuracy=0.01)) %>% 
+  dplyr::select(HourDK,Next_Three_Hours) %>% 
+  knitr::kable()
+```
+
+
+```{r}
+lwr_upr = df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
+  filter(SpotPriceDKK_z<=0) %>% 
+  dplyr::mutate(Cheap="Cheap")
+
+df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
+  geom_line() +
+  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK,color=Cheap),size=2) +
+  scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
+  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=45,hjust=1)) +
+  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  labs(title="Lowest Upcoming Prices",
+       subtitle="East Denmark",
+       x="Hour",
+       y="Price (DKK)") +
+  theme(legend.position="null")
+
+
+```
 ## Last Week & Upcoming
 
 ```{r}
@@ -217,7 +286,8 @@ df %>%
        subtitle="East Denmark, with 95% CI",
        x="Month",
        y="Price (DKK)") +
-  theme(legend.position="null")
+  theme(legend.position="null") +
+  geom_vline(xintercept = seq.POSIXt(ymd_hms("2015-01-01 00:00:00"),ymd_hms("2030-01-01 00:00:00"),by = "1 year"))
 
 ```
 
