@@ -75,6 +75,7 @@ max_forecast_day
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
+  arrange(HourDK) %>% 
   dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1))/2) %>% 
   filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
   filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
@@ -99,6 +100,7 @@ max_forecast_day
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
+  arrange(HourDK) %>% 
   dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1)+lead(SpotPriceDKK,n=2))/3) %>% 
   filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
   filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
