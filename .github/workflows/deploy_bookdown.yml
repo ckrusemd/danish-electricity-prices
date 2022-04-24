@@ -62,7 +62,7 @@ jobs:
         # Optional (recommended) mail server password:
         password: ${{secrets.MAIL_PASSWORD}}
         # Required mail subject:
-        subject: Github Actions job result
+        subject: Danish Electricity Prices - Daily Update
         # Required recipients' addresses:
         to: ${{secrets.MAIL_USERNAME}}
         # Required sender full name (address can be skipped):
