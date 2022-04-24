@@ -50,8 +50,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         EMAIL: ${{ secrets.EMAIL }}
         BUILD_DIR: _book/
-
-  send-mail:
     - name: Send mail
       uses: dawidd6/action-send-mail@v3
       with:
