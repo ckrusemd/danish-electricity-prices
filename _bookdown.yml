@@ -1,4 +1,7 @@
-rmd_files: 
-  html: ["index.Rmd","EAST.Rmd","WEST.Rmd"]
-  latex: ["EAST.Rmd"]
+rmd_files: ["index.Rmd","EAST.Rmd","WEST.Rmd"]
+output:
+  bookdown::gitbook:
+    lib_dir: "_book"
+  bookdown::pdf_book:
+    keep_tex: yes
 delete_merged_file: true
