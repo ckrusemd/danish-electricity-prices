@@ -14,6 +14,8 @@ pacman::p_load(tidyr,
                dplyr,
                ggplot2,
                httr,
+               rpart.plot,
+               caret,
                lubridate)
 ```
 
@@ -290,6 +292,34 @@ df %>%
        y="Price (DKK)") +
   theme(legend.position="null") +
   geom_vline(xintercept = seq.POSIXt(ymd_hms("2015-01-01 00:00:00"),ymd_hms("2030-01-01 00:00:00"),by = "1 year"))
+
+```
+
+## Time Windows
+
+```{r }
+
+df_predict_all_week = df %>% 
+  filter(HourDK >= ymd("2022-01-01")) %>% 
+  dplyr::mutate(Hour = hour(HourDK),
+                Day = factor(paste0(wday(HourDK,label = TRUE)))) %>% 
+  dplyr::select(SpotPriceDKK,Hour,Day)
+
+train_control = caret::trainControl(method = "repeatedcv",number = 5,repeats = 5)
+fit_rpart = caret::train(y = df_predict_all_week$SpotPriceDKK,
+                         x = df_predict_all_week %>% dplyr::select(-SpotPriceDKK) %>% as.data.frame(),
+                         method = "rpart",
+                         tuneLength=50,
+                         metric = "RMSE",
+                         trControl = train_control)
+
+rpart.plot(fit_rpart$finalModel)
+rpart.rules(fit_rpart$finalModel)
+
+```
+
+```{r}
+
 
 ```
 
