@@ -20,7 +20,7 @@ pacman::p_load(tidyr,
 ```
 
 ```{r}
-
+ 
 api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK1%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=35000"
 api_url = utils::URLencode(api_url)
 api_result = httr::GET(api_url)
