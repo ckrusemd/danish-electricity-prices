@@ -21,11 +21,12 @@ pacman::p_load(tidyr,
 
 ```{r}
 
-api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 30000'
-api_url = utils::URLencode(api_url)
+# api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 30000'
+api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK2%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=35000"
+# api_url = utils::URLencode(api_url)
 api_result = httr::GET(api_url)
 api_json = rawToChar(api_result$content)
-df <- jsonlite::fromJSON(api_json)$result$records
+df <- jsonlite::fromJSON(api_json)$records
 df = df %>% 
   dplyr::mutate(HourDK=ymd_hms(HourDK,tz = "Europe/Copenhagen"),
                 SpotPriceDKK=SpotPriceDKK/1000,
@@ -152,7 +153,7 @@ df %>%
   ggplot(.,aes(x=Day_Num,y=Hour)) +
   geom_tile(aes(fill=SpotPriceDKK)) +
   scale_fill_gradient(low = "green",high = "red") +
-  scale_x_datetime(date_breaks = "1 day",date_labels = "%b %d") +
+  scale_x_datetime(date_breaks = "1 day",date_labels = "%a %b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
   theme_bw() +
   geom_text(aes(label=scales::number(SpotPriceDKK,accuracy = 0.01)))  +
@@ -315,11 +316,6 @@ fit_rpart = caret::train(y = df_predict_all_week$SpotPriceDKK,
 
 rpart.plot(fit_rpart$finalModel)
 rpart.rules(fit_rpart$finalModel)
-
-```
-
-```{r}
-
 
 ```
 
