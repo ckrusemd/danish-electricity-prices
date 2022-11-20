@@ -20,12 +20,12 @@ pacman::p_load(tidyr,
 ```
 
 ```{r}
- 
-api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK1%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=35000"
-api_url = utils::URLencode(api_url)
-api_result = httr::GET(api_url)
-api_json = rawToChar(api_result$content)
-df <- jsonlite::fromJSON(api_json)$result$records
+   
+  api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK1%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=10000"
+  api_url = utils::URLencode(api_url)
+  api_result = httr::GET(api_url)
+  api_json = rawToChar(api_result$content)
+  df <- jsonlite::fromJSON(api_json)$records
 df = df %>% 
   dplyr::mutate(HourDK=ymd_hms(HourDK,tz = "Europe/Copenhagen"),
                 SpotPriceDKK=SpotPriceDKK/1000,
