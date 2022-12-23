@@ -1,7 +1,7 @@
 ---
 title: "Electricity Prices"
 author: "CAKU"
-date: "3/26/2022"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
