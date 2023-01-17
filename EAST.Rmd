@@ -15,9 +15,19 @@ pacman::p_load(tidyr,
                ggplot2,
                httr,
                rpart.plot,
+               pushoverr,
                caret,
                lubridate)
 ```
+
+```{r warning=FALSE,message=FALSE,include=FALSE}
+readRenviron(path = "Renviron.site")
+OPENWEATHERMAP_APIKEY = Sys.getenv("OPENWEATHERMAP_APIKEY")
+pushoverr::set_pushover_app(token = Sys.getenv("PUSHOVER_APPKEY"))
+pushoverr::set_pushover_user(user = Sys.getenv("PUSHOVER_USERKEY"))
+
+```
+
 
 ```{r}
 
@@ -49,7 +59,7 @@ lwr_upr = df %>%
   filter(SpotPriceDKK_z<=0) %>% 
   dplyr::mutate(Cheap="Cheap")
 
-df %>% 
+p1 = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
   geom_line() +
@@ -64,7 +74,11 @@ df %>%
        x="Hour",
        y="Price (DKK)") +
   theme(legend.position="null")
+p1
 
+```
+
+```{r}
 
 ```
 
@@ -319,3 +333,12 @@ rpart.rules(fit_rpart$finalModel)
 
 ```
 
+
+
+
+```{r}
+
+tmp_dir = tempdir()
+ggsave(filename = paste0(tmp_dir,"/p1.jpg"),plot = p1,device = "jpeg")
+pushoverr::pushover("Electricity Forecast",attachment = paste0(tmp_dir,"/p1.jpg"))
+```
