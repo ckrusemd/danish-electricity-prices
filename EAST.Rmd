@@ -22,7 +22,6 @@ pacman::p_load(tidyr,
 
 ```{r warning=FALSE,message=FALSE,include=FALSE}
 readRenviron(path = "Renviron.site")
-OPENWEATHERMAP_APIKEY = Sys.getenv("OPENWEATHERMAP_APIKEY")
 pushoverr::set_pushover_app(token = Sys.getenv("PUSHOVER_APPKEY"))
 pushoverr::set_pushover_user(user = Sys.getenv("PUSHOVER_USERKEY"))
 
@@ -340,5 +339,5 @@ rpart.rules(fit_rpart$finalModel)
 
 tmp_dir = tempdir()
 ggsave(filename = paste0(tmp_dir,"/p1.jpg"),plot = p1,device = "jpeg")
-pushoverr::pushover("Electricity Forecast",attachment = paste0(tmp_dir,"/p1.jpg"))
+pushoverr::pushover(message = "Electricity Forecast",attachment = paste0(tmp_dir,"/p1.jpg"))
 ```
