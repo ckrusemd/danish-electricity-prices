@@ -17,6 +17,9 @@ pacman::p_load(tidyr,
                rpart.plot,
                pushoverr,
                caret,
+               zoo,
+               glue,
+               rPref,
                lubridate)
 ```
 
@@ -77,10 +80,6 @@ p1
 
 ```
 
-```{r}
-
-```
-
 ## Best Two-Hour Window
 
 ```{r}
@@ -89,41 +88,31 @@ min_forecast_day = Sys.time()
 
 max_forecast_day
 
-df %>% 
-  filter(HourDK >= min_forecast_day) %>% 
-  arrange(HourDK) %>% 
-  dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1))/2) %>% 
-  filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
-  filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
-  dplyr::mutate(HourDK=format(HourDK,"%H:%M"),
-                Next_Two_Hours=scales::number(Next_Three_Hours,accuracy=0.01)) %>% 
-  dplyr::select(HourDK,Next_Two_Hours) %>% 
+df_windows = lapply(seq(2,5),function(window) {
+  
+  df %>% 
+    filter(HourDK >= max_forecast_day) %>% 
+    filter(hour(HourDK) >= 7) %>% 
+    filter(hour(HourDK) <= 17) %>% 
+    arrange(HourDK) %>% 
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK,k = window,fill = NA,align = "left"),
+                  window=window) %>% 
+    dplyr::mutate(rollingsum=rollingsum/window) %>% 
+    na.omit
+  
+})
+df_windows = do.call("rbind",df_windows)
+
+# Consider again the preference from above
+p <- low(rollingsum) * high(window)
+
+# Calculate the level-value w.r.t. p by using top-all
+res <- psel(df_windows, p, top = nrow(df_windows)) %>% filter(.level==min(.level))
+res %>% 
+  dplyr::select(HourDK,.level,rollingsum,window) %>% 
   knitr::kable()
-```
 
-## Best Three-Hour Window
 
-```{r}
-max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
-min_forecast_day = Sys.time()
-
-max_forecast_day
-
-max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
-min_forecast_day = Sys.time()
-
-max_forecast_day
-
-df %>% 
-  filter(HourDK >= min_forecast_day) %>% 
-  arrange(HourDK) %>% 
-  dplyr::mutate(Next_Three_Hours=(SpotPriceDKK+lead(SpotPriceDKK,n=1)+lead(SpotPriceDKK,n=2))/3) %>% 
-  filter(hour(HourDK)>=6 & hour(HourDK)<=20) %>% 
-  filter(Next_Three_Hours==min(Next_Three_Hours,na.rm=T)) %>% 
-  dplyr::mutate(HourDK=format(HourDK,"%H:%M"),
-                Next_Three_Hours=scales::number(Next_Three_Hours,accuracy=0.01)) %>% 
-  dplyr::select(HourDK,Next_Three_Hours) %>% 
-  knitr::kable()
 ```
 
 
@@ -340,4 +329,13 @@ rpart.rules(fit_rpart$finalModel)
 tmp_dir = tempdir()
 ggsave(filename = paste0(tmp_dir,"/p1.jpg"),plot = p1,device = "jpeg")
 pushoverr::pushover(message = "Electricity Forecast",attachment = paste0(tmp_dir,"/p1.jpg"))
+
+# Best windows
+msg_ = res %>% 
+  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK")) %>% 
+  pull(label_) %>% 
+  paste(.,collapse="\n")
+msg_ = paste0("ELECTRICITY BEST WINDOWS:\n",msg_)
+pushoverr::pushover(message = msg_)
+
 ```
