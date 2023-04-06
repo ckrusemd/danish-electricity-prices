@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: r-lib/actions/setup-r@v2
+      - name: Renviron
+        run: echo $'PUSHOVER_APPKEY=${{ secrets.PUSHOVER_APPKEY }}\nPUSHOVER_USERKEY=${{ secrets.PUSHOVER_USERKEY }}' >> Renviron.site
       - name: Render Book from Action
         uses: ckrusemd/rmarkdown-action@v0.21
         with:
