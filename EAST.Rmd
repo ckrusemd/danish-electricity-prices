@@ -88,6 +88,8 @@ min_forecast_day = Sys.time()
 
 max_forecast_day
 
+mean_sd = df %>% filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% dplyr::summarize(mean_=mean(SpotPriceDKK),sd_=sd(SpotPriceDKK))
+
 df_windows = lapply(seq(2,5),function(window) {
   
   df %>% 
@@ -98,6 +100,8 @@ df_windows = lapply(seq(2,5),function(window) {
     dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK,k = window,fill = NA,align = "left"),
                   window=window) %>% 
     dplyr::mutate(rollingsum=rollingsum/window) %>% 
+    dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
+  dplyr::mutate(p_label=scales::percent(p_norm,accuracy=1)) %>% 
     na.omit
   
 })
@@ -109,7 +113,7 @@ p <- low(rollingsum) * high(window)
 # Calculate the level-value w.r.t. p by using top-all
 res <- psel(df_windows, p, top = nrow(df_windows)) %>% filter(.level==min(.level))
 res %>% 
-  dplyr::select(HourDK,.level,rollingsum,window) %>% 
+  dplyr::select(HourDK,.level,rollingsum,window,p_norm) %>% 
   knitr::kable()
 
 
@@ -332,7 +336,7 @@ pushoverr::pushover(message = "Electricity Forecast",attachment = paste0(tmp_dir
 
 # Best windows
 msg_ = res %>% 
-  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK")) %>% 
+  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK ({p_label})")) %>% 
   pull(label_) %>% 
   paste(.,collapse="\n")
 msg_ = paste0("ELECTRICITY BEST WINDOWS:\n",msg_)
