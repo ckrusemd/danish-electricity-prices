@@ -38,14 +38,27 @@ api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter
 api_url = utils::URLencode(api_url)
 api_result = httr::GET(api_url)
 api_json = rawToChar(api_result$content)
-  df <- jsonlite::fromJSON(api_json)$records
+df <- jsonlite::fromJSON(api_json)$records
 df = df %>% 
   dplyr::mutate(HourDK=ymd_hms(HourDK,tz = "Europe/Copenhagen"),
                 SpotPriceDKK=SpotPriceDKK/1000,
                 SpotPriceEUR=SpotPriceEUR/1000) %>% 
   dplyr::mutate(ExchangeRate=SpotPriceDKK/SpotPriceEUR) %>% 
-  dplyr::mutate(SpotPriceDKK=ifelse(is.na(SpotPriceDKK),SpotPriceEUR*7.43988,SpotPriceDKK))
+  dplyr::mutate(SpotPriceDKK=ifelse(is.na(SpotPriceDKK),SpotPriceEUR*7.43988,SpotPriceDKK)) %>% 
+  # Radius nettarif per 30. september 2023, moms 20%, afgift 87.13 ører.
+  dplyr::mutate(transport=case_when(month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(0,5,by=1)~15.19,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(6,16,by=1)~22.77,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(17,20,by=1)~59.23,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(21,23,by=1)~22.77,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(0,5,by=1)~15.19,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(6,16,by=1)~45.56,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(17,20,by=1)~136.68,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(21,23,by=1)~45.56,
+                TRUE~as.numeric(NA))) %>% 
+  dplyr::mutate(elafgift=87.13) %>% 
+  dplyr::mutate(SpotPriceDKK_Total=1.2*(SpotPriceDKK+transport/100+elafgift/100))
 ```
+
 
 ## Best Upcoming
 
@@ -57,15 +70,15 @@ min_forecast_day = Sys.time()
 
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
   filter(SpotPriceDKK_z<=0) %>% 
   dplyr::mutate(Cheap="Cheap")
 
 p1 = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
-  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK,color=Cheap),size=2) +
+  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
@@ -88,7 +101,7 @@ min_forecast_day = Sys.time()
 
 max_forecast_day
 
-mean_sd = df %>% filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% dplyr::summarize(mean_=mean(SpotPriceDKK),sd_=sd(SpotPriceDKK))
+mean_sd = df %>% filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
 
 df_windows = lapply(seq(2,5),function(window) {
   
@@ -97,7 +110,7 @@ df_windows = lapply(seq(2,5),function(window) {
     filter(hour(HourDK) >= 7) %>% 
     filter(hour(HourDK) <= 17) %>% 
     arrange(HourDK) %>% 
-    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK,k = window,fill = NA,align = "left"),
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
                   window=window) %>% 
     dplyr::mutate(rollingsum=rollingsum/window) %>% 
     dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
@@ -123,15 +136,15 @@ res %>%
 ```{r}
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
   filter(SpotPriceDKK_z<=0) %>% 
   dplyr::mutate(Cheap="Cheap")
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
-  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK,color=Cheap),size=2) +
+  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
@@ -157,12 +170,12 @@ df %>%
   dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
                 Hour=lubridate::hour(HourDK)) %>% 
   ggplot(.,aes(x=Day_Num,y=Hour)) +
-  geom_tile(aes(fill=SpotPriceDKK)) +
+  geom_tile(aes(fill=SpotPriceDKK_Total)) +
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%a %b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
   theme_bw() +
-  geom_text(aes(label=scales::number(SpotPriceDKK,accuracy = 0.01)))  +
+  geom_text(aes(label=scales::number(SpotPriceDKK_Total,accuracy = 0.01)))  +
   labs(title="Previous Week and Upcoming Prices",
        subtitle="East Denmark",
        x="Day",
@@ -178,9 +191,9 @@ min_forecast_day = max_forecast_day-days(7)
 
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
   filter(SpotPriceDKK_z<=qnorm(p = 0.975) | SpotPriceDKK_z<=qnorm(p = 0.025)) %>% 
-  dplyr::summarise(lwr=min(SpotPriceDKK),upr=max(SpotPriceDKK))
+  dplyr::summarise(lwr=min(SpotPriceDKK_Total),upr=max(SpotPriceDKK_Total))
 
 lwr_upr_date = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
@@ -189,7 +202,7 @@ lwr_upr_date = df %>%
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
   scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
@@ -217,7 +230,7 @@ df %>%
   dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
                 Hour=lubridate::hour(HourDK)) %>% 
   ggplot(.,aes(x=Day_Num,y=Hour)) +
-  geom_tile(aes(fill=SpotPriceDKK)) +
+  geom_tile(aes(fill=SpotPriceDKK_Total)) +
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "7 day",date_labels = "%b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
@@ -236,9 +249,9 @@ min_forecast_day = max_forecast_day-months(1)
 
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK)) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
   filter(SpotPriceDKK_z<=qnorm(p = 0.975) | SpotPriceDKK_z<=qnorm(p = 0.025)) %>% 
-  dplyr::summarise(lwr=min(SpotPriceDKK),upr=max(SpotPriceDKK))
+  dplyr::summarise(lwr=min(SpotPriceDKK_Total),upr=max(SpotPriceDKK_Total))
 
 lwr_upr_date = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
@@ -247,7 +260,7 @@ lwr_upr_date = df %>%
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK)) +
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
   scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
@@ -307,14 +320,14 @@ df %>%
 ```{r }
 
 df_predict_all_week = df %>% 
-  filter(HourDK >= ymd("2022-01-01")) %>% 
+  filter(HourDK >= Sys.Date()-months(6)) %>% 
   dplyr::mutate(Hour = hour(HourDK),
                 Day = factor(paste0(wday(HourDK,label = TRUE)))) %>% 
-  dplyr::select(SpotPriceDKK,Hour,Day)
+  dplyr::select(SpotPriceDKK_Total,Hour,Day)
 
 train_control = caret::trainControl(method = "repeatedcv",number = 5,repeats = 5)
-fit_rpart = caret::train(y = df_predict_all_week$SpotPriceDKK,
-                         x = df_predict_all_week %>% dplyr::select(-SpotPriceDKK) %>% as.data.frame(),
+fit_rpart = caret::train(y = df_predict_all_week$SpotPriceDKK_Total,
+                         x = df_predict_all_week %>% dplyr::select(-SpotPriceDKK_Total) %>% as.data.frame(),
                          method = "rpart",
                          tuneLength=50,
                          metric = "RMSE",
