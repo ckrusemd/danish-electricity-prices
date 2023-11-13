@@ -101,13 +101,17 @@ min_forecast_day = Sys.time()
 
 max_forecast_day
 
-mean_sd = df %>% filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
+mean_sd = df %>% 
+  filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
+    filter(hour(HourDK) >= 6) %>% 
+    filter(hour(HourDK) <= 17) %>% 
+  dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
 
 df_windows = lapply(seq(2,5),function(window) {
   
   df %>% 
     filter(HourDK >= max_forecast_day) %>% 
-    filter(hour(HourDK) >= 7) %>% 
+    filter(hour(HourDK) >= 6) %>% 
     filter(hour(HourDK) <= 17) %>% 
     arrange(HourDK) %>% 
     dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
