@@ -56,7 +56,8 @@ df = df %>%
                                     month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(21,23,by=1)~45.56,
                 TRUE~as.numeric(NA))) %>% 
   dplyr::mutate(elafgift=87.13) %>% 
-  dplyr::mutate(SpotPriceDKK_Total=1.2*(SpotPriceDKK+transport/100+elafgift/100))
+  dplyr::mutate(SpotPriceDKK_Total=1.2*(SpotPriceDKK+transport/100+elafgift/100)) %>% 
+  dplyr::mutate(SpotPriceDKK_Total_SansAfgift=1.2*(SpotPriceDKK+transport/100))
 ```
 
 
@@ -79,8 +80,10 @@ p1 = df %>%
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
   geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_hline(yintercept = 0) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
-  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
+  scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
@@ -93,6 +96,36 @@ p1
 
 ```
 
+## Best Upcoming, All Day
+
+```{r}
+
+lwr_upr = df %>% 
+  filter(HourDK >= Sys.time()) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
+  filter(SpotPriceDKK_z<=0) %>% 
+  dplyr::mutate(Cheap="Cheap")
+
+p2 = df %>% 
+  filter(HourDK >= Sys.time()) %>% 
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
+  geom_line() +
+  geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_hline(yintercept = 0) +
+  scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
+  scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=45,hjust=1)) +
+  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  labs(title="Lowest Upcoming Prices",
+       subtitle="East Denmark",
+       x="Hour",
+       y="Price (DKK)") +
+  theme(legend.position="null")
+p2
+
+```
 ## Best Two-Hour Window
 
 ```{r}
@@ -137,6 +170,45 @@ res %>%
 ```
 
 
+## Best Two-Hour Window, All Day
+
+```{r}
+
+mean_sd = df %>% 
+  filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
+    filter(hour(HourDK) >= 6) %>% 
+    filter(hour(HourDK) <= 17) %>% 
+  dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
+
+df_windows = lapply(seq(2,5),function(window) {
+  
+  df %>% 
+    filter(HourDK >= Sys.time()) %>% 
+    filter(hour(HourDK) >= 6) %>% 
+    filter(hour(HourDK) <= 17) %>% 
+    arrange(HourDK) %>% 
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
+                  window=window) %>% 
+    dplyr::mutate(rollingsum=rollingsum/window) %>% 
+    dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
+  dplyr::mutate(p_label=scales::percent(p_norm,accuracy=1)) %>% 
+    na.omit
+  
+})
+df_windows = do.call("rbind",df_windows)
+
+# Consider again the preference from above
+p <- low(rollingsum) * high(window)
+
+# Calculate the level-value w.r.t. p by using top-all
+res_2 <- psel(df_windows, p, top = nrow(df_windows)) %>% filter(.level==min(.level))
+res_2 %>% 
+  dplyr::select(HourDK,.level,rollingsum,window,p_norm) %>% 
+  knitr::kable()
+
+
+```
+
 ```{r}
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
@@ -149,8 +221,10 @@ df %>%
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
   geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
-  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
@@ -208,8 +282,10 @@ df %>%
   filter(HourDK >= min_forecast_day) %>% 
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
@@ -266,8 +342,10 @@ df %>%
   filter(HourDK >= min_forecast_day) %>% 
   ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
   geom_line() +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
@@ -353,7 +431,8 @@ pushoverr::pushover(message = "Electricity Forecast",attachment = paste0(tmp_dir
 
 # Best windows
 msg_ = res %>% 
-  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK ({p_label})")) %>% 
+  dplyr::mutate(diff_hours=as.numeric(difftime(HourDK,as.POSIXct(Sys.Date()+hours(6),tz="Europe/Copenhagen"),units = "mins"))/60) %>% 
+  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK ({p_label}), Delay: {diff_hours}")) %>% 
   pull(label_) %>% 
   paste(.,collapse="\n")
 msg_ = paste0("ELECTRICITY BEST WINDOWS:\n",msg_)
