@@ -35,7 +35,7 @@ pushoverr::set_pushover_user(user = Sys.getenv("PUSHOVER_USERKEY"))
 
 # api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 30000'
 # api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK2%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=35000"
-api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&sort=HourUTC%20DESC&timezone=dk&limit=35000"
+api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&sort=HourUTC%20DESC&timezone=dk&limit=50000"
 
 
 api_url = utils::URLencode(api_url)
@@ -50,18 +50,20 @@ df = df %>%
   dplyr::mutate(ExchangeRate=SpotPriceDKK/SpotPriceEUR) %>% 
   dplyr::mutate(SpotPriceDKK=ifelse(is.na(SpotPriceDKK),SpotPriceEUR*7.43988,SpotPriceDKK)) %>% 
   # Radius nettarif per 30. september 2023, moms 20%, afgift 87.13 ører.
-  dplyr::mutate(transport=case_when(month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(0,5,by=1)~15.19,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(6,16,by=1)~22.77,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(17,20,by=1)~59.23,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(21,23,by=1)~22.77,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(0,5,by=1)~15.19,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(6,16,by=1)~45.56,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(17,20,by=1)~136.68,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(21,23,by=1)~45.56,
+  dplyr::mutate(transport=case_when(month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(0,5,by=1)~12.20,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(6,16,by=1)~18.31,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(17,20,by=1)~47.60,
+                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(21,23,by=1)~18.31,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(0,5,by=1)~12.20,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(6,16,by=1)~36.61,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(17,20,by=1)~109.85,
+                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(21,23,by=1)~36.61,
                 TRUE~as.numeric(NA))) %>% 
-  dplyr::mutate(elafgift=87.13) %>% 
-  dplyr::mutate(SpotPriceDKK_Total=1.2*(SpotPriceDKK+transport/100+elafgift/100)) %>% 
-  dplyr::mutate(SpotPriceDKK_Total_SansAfgift=1.2*(SpotPriceDKK+transport/100))
+  dplyr::mutate(transport=transport*0.8) %>%  # uden moms
+  dplyr::mutate(elafgift=72.00) %>% 
+  dplyr::mutate(SpotPriceDKK_Total=1.25*(SpotPriceDKK+transport/100+elafgift/100)) %>% 
+  dplyr::mutate(SpotPriceDKK_Total_SansAfgift=1.25*(SpotPriceDKK+transport/100)) %>% 
+  dplyr::mutate(SpotPriceDKK_Total_SansAfgiftTransport=1.25*(SpotPriceDKK/100))
 ```
 
 
@@ -69,6 +71,13 @@ df = df %>%
 
 ```{r}
 
+df_previous = df %>% 
+  dplyr::mutate(Day=wday(HourDK,label=TRUE,abbr=FALSE),
+                Hour=hour(HourDK)) %>% 
+  dplyr::mutate(Day=factor(Day)) %>% 
+  dplyr::select(Day,
+                Hour,
+                SpotPriceDKK_Total_SansAfgift)
 
 max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
 min_forecast_day = Sys.time()
@@ -81,21 +90,26 @@ lwr_upr = df %>%
 
 p1 = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
-  geom_line() +
+  dplyr::mutate(Day=wday(HourDK,label=TRUE,abbr=FALSE)) %>% 
+  dplyr::mutate(HourDK=hour(HourDK)) %>% 
+  dplyr::mutate(Day=factor(Day)) %>% 
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift,color=Day)) +
+  geom_line(size=3) +
   # geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
-  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total),linetype=2) +
+  # geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgiftTransport),linetype=4) +
   geom_hline(yintercept = 0) +
-  scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
+  # scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
-  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
        subtitle="East Denmark",
        x="Hour",
        y="Price (DKK)") +
-  theme(legend.position="null")
+  # theme(legend.position="null") +
+  geom_smooth(data=df_previous,aes(x=Hour,y=SpotPriceDKK_Total_SansAfgift,linetype=Day),alpha=0,size=0.4)
 p1
 
 ```
@@ -116,12 +130,13 @@ p2 = df %>%
   geom_line() +
   # geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
   geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
-  geom_hline(yintercept = 0) +
+  geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgiftTransport),linetype=4) +
+  # geom_hline(yintercept = 0) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
-  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
        subtitle="East Denmark",
        x="Hour",
@@ -226,12 +241,12 @@ df %>%
   geom_line() +
   # geom_line(data=lwr_upr,aes(x=HourDK,y=SpotPriceDKK_Total,color=Cheap),size=2) +
   geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
-  geom_hline(yintercept = 0) +
+  # geom_hline(yintercept = 0) +
   scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   theme_bw() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
-  geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
+  # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
        subtitle="East Denmark",
        x="Hour",
@@ -302,6 +317,93 @@ df %>%
 
 ```
 
+## Best time spans
+
+```{r}
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = expand.grid(start=seq(0,23,by=1),
+            stop=seq(1,24,by=1)) %>% 
+  filter(start<stop) %>% 
+  tidyr::crossing(df) %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(Hour>=start,Hour<stop) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(start=seq(0,23,by=1),
+            stop=seq(1,24,by=1)) %>% 
+  filter(start<stop) %>% 
+  tidyr::crossing(df) %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(Hour>=start,Hour<stop) %>% 
+  dplyr::mutate(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  group_by(start,stop,SpotPriceMean) %>% 
+  dplyr::summarize(SpotPriceDKK_Total_SansAfgift=mean(SpotPriceDKK_Total_SansAfgift,na.rm=T)) %>% 
+  ggplot(aes(x=start,y=stop)) +
+  geom_tile(aes(fill=SpotPriceDKK_Total_SansAfgift)) +
+  scale_fill_gradient2(midpoint = mean_price_spot,low = "green",mid = "white",high = "red") +
+  scale_x_continuous(breaks = seq(0,24,by=1)) +
+  scale_y_continuous(breaks = seq(0,24,by=1))
+```
+
+
+```{r}
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = expand.grid(start=seq(0,23,by=1),
+            stop=seq(1,24,by=1)) %>% 
+  filter(start<stop) %>% 
+  tidyr::crossing(df) %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(Hour>=start,Hour<stop) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(start=seq(0,23,by=1),
+            stop=seq(1,24,by=1)) %>% 
+  filter(start<stop) %>% 
+  tidyr::crossing(df) %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(Hour>=start,Hour<stop) %>% 
+  dplyr::mutate(SpotPriceMean=mean(SpotPriceDKK)) %>% 
+  group_by(start,stop,SpotPriceMean) %>% 
+  dplyr::summarize(SpotPriceDKK=mean(SpotPriceDKK,na.rm=T)) %>% 
+  ggplot(aes(x=start,y=stop)) +
+  geom_tile(aes(fill=SpotPriceDKK)) +
+  scale_fill_gradient2(midpoint = mean_price_spot,low = "green",mid = "white",high = "red") +
+  scale_x_continuous(breaks = seq(0,24,by=1)) +
+  scale_y_continuous(breaks = seq(0,24,by=1))
+```
+
+```{r}
+df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  ggplot(.,aes(x=Day_Num,y=Hour)) +
+  geom_tile(aes(fill=SpotPriceDKK_Total)) +
+  scale_fill_gradient(low = "green",high = "red") +
+  scale_x_datetime(date_breaks = "7 day",date_labels = "%b %d") +
+  scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
+  theme_bw()  +
+  labs(title="Previous Month and Upcoming Prices",
+       subtitle="East Denmark",
+       x="Day",
+       y="Hour") +
+  theme(legend.position="null")
+```
+
 ## Last Month & Upcoming
 
 ```{r}
@@ -324,6 +426,31 @@ df %>%
        x="Day",
        y="Hour") +
   theme(legend.position="null")
+```
+
+# Box plot
+
+```{r}
+
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  dplyr::mutate(Hour=factor(Hour)) %>% 
+  ggplot(.,aes(x=Hour,y=SpotPriceDKK_Total_SansAfgift)) +
+  geom_boxplot() +
+  # geom_violin() +
+  scale_y_continuous(breaks = seq(0,10,by=0.25)) +
+  theme_bw()  +
+  labs(title="Prices by Hour",
+       subtitle="East Denmark",
+       x="Day",
+       y="Hour") +
+  theme(legend.position="null") 
 ```
 
 ```{r}
@@ -425,6 +552,130 @@ rpart.rules(fit_rpart$finalModel)
 ```
 
 
+# Effect of reduced afgift
+
+```{r}
+expand.grid(kwh=seq(100*31)) %>% 
+  dplyr::mutate(over4k=case_when(kwh>(4000/12)~kwh-(4000/12),
+                                 TRUE~0)) %>% 
+  dplyr::mutate(under4k=case_when(kwh<=(4000/12)~kwh,
+                                 TRUE~(4000/12))) %>% 
+  dplyr::mutate(afgift=0.90*under4k+0.01*over4k) %>% 
+  ggplot(aes(x=kwh,y=afgift)) +
+  geom_line() +
+  labs(title="Monthly afgift by monthly kWh")
+```
+
+# Total kWh price by total use
+
+```{r}
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(kwh=seq(100*31)) %>% 
+  dplyr::mutate(over4k=case_when(kwh>(4000/12)~kwh-(4000/12),
+                                 TRUE~0)) %>% 
+  dplyr::mutate(under4k=case_when(kwh<=(4000/12)~kwh,
+                                 TRUE~(4000/12))) %>% 
+  dplyr::mutate(afgift=0.90*under4k+0.01*over4k) %>% 
+  dplyr::mutate(SpotPriceDKK=kwh*mean_price_spot+afgift) %>% 
+  ggplot(aes(x=kwh,y=SpotPriceDKK)) +
+  geom_line() +
+  labs(title="Monthly afgift by monthly kWh")
+```
+
+# Total kWh price by total use (outside 17-21)
+
+```{r}
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(!Hour %in% c(17,18,19,20)) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(kwh=seq(100*31)) %>% 
+  dplyr::mutate(over4k=case_when(kwh>(4000/12)~kwh-(4000/12),
+                                 TRUE~0)) %>% 
+  dplyr::mutate(under4k=case_when(kwh<=(4000/12)~kwh,
+                                 TRUE~(4000/12))) %>% 
+  dplyr::mutate(afgift=0.90*under4k+0.01*over4k) %>% 
+  dplyr::mutate(SpotPriceDKK=kwh*mean_price_spot+afgift) %>% 
+  ggplot(aes(x=kwh,y=SpotPriceDKK)) +
+  geom_line() +
+  labs(title="Monthly afgift by monthly kWh")
+```
+
+# Average  kWh price by total use
+
+```{r}
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(kwh=seq(100*31)) %>% 
+  dplyr::mutate(over4k=case_when(kwh>(4000/12)~kwh-(4000/12),
+                                 TRUE~0)) %>% 
+  dplyr::mutate(under4k=case_when(kwh<=(4000/12)~kwh,
+                                 TRUE~(4000/12))) %>% 
+  dplyr::mutate(afgift=0.90*under4k+0.01*over4k) %>% 
+  dplyr::mutate(SpotPriceDKK=kwh*mean_price_spot+afgift) %>% 
+  dplyr::mutate(SpotPriceDKK=SpotPriceDKK/kwh) %>% 
+  ggplot(aes(x=kwh,y=SpotPriceDKK)) +
+  geom_line() +
+  labs(title="Monthly afgift by monthly kWh")
+```
+
+
+# Average  kWh price by total use (outside 17-12)
+
+```{r}
+
+max_forecast_day = lubridate::floor_date(max(df$HourDK),unit = "day")
+min_forecast_day = max_forecast_day-months(1)
+
+mean_price_spot = df %>% 
+  filter(HourDK >= min_forecast_day) %>% 
+  dplyr::mutate(Day_Num=lubridate::floor_date(HourDK,unit = "day"),
+                Hour=lubridate::hour(HourDK)) %>% 
+  filter(!Hour %in% c(17,18,19,20)) %>% 
+  dplyr::summarize(SpotPriceMean=mean(SpotPriceDKK_Total_SansAfgift)) %>% 
+  pull(SpotPriceMean)
+
+expand.grid(kwh=seq(100*31)) %>% 
+  dplyr::mutate(over4k=case_when(kwh>(4000/12)~kwh-(4000/12),
+                                 TRUE~0)) %>% 
+  dplyr::mutate(under4k=case_when(kwh<=(4000/12)~kwh,
+                                 TRUE~(4000/12))) %>% 
+  dplyr::mutate(afgift=0.90*under4k+0.01*over4k) %>% 
+  dplyr::mutate(SpotPriceDKK=kwh*mean_price_spot+afgift) %>% 
+  dplyr::mutate(SpotPriceDKK=SpotPriceDKK/kwh) %>% 
+  ggplot(aes(x=kwh,y=SpotPriceDKK)) +
+  geom_line() +
+  labs(title="Monthly afgift by monthly kWh")
+```
+
+# Send message
 
 
 ```{r}
