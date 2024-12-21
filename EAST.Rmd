@@ -157,7 +157,7 @@ mean_sd = df %>%
   filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
     filter(hour(HourDK) >= 6) %>% 
     filter(hour(HourDK) <= 17) %>% 
-  dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
+  dplyr::summarize(mean_=mean(SpotPriceDKK_Total_SansAfgift),sd_=sd(SpotPriceDKK_Total_SansAfgift))
 
 df_windows = lapply(seq(2,5),function(window) {
   
@@ -166,7 +166,8 @@ df_windows = lapply(seq(2,5),function(window) {
     # filter(hour(HourDK) >= 6) %>% 
     # filter(hour(HourDK) <= 17) %>% 
     arrange(HourDK) %>% 
-    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total_SansAfgift,k = window,fill = NA,align = "left"),
+    # dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
                   window=window) %>% 
     dplyr::mutate(rollingsum=rollingsum/window) %>% 
     dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
@@ -197,7 +198,7 @@ mean_sd = df %>%
   filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
     filter(hour(HourDK) >= 6) %>% 
     filter(hour(HourDK) <= 17) %>% 
-  dplyr::summarize(mean_=mean(SpotPriceDKK_Total),sd_=sd(SpotPriceDKK_Total))
+  dplyr::summarize(mean_=mean(SpotPriceDKK_Total_SansAfgift),sd_=sd(SpotPriceDKK_Total_SansAfgift))
 
 df_windows = lapply(seq(2,5),function(window) {
   
@@ -206,7 +207,7 @@ df_windows = lapply(seq(2,5),function(window) {
     # filter(hour(HourDK) >= 6) %>% 
     # filter(hour(HourDK) <= 17) %>% 
     arrange(HourDK) %>% 
-    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total,k = window,fill = NA,align = "left"),
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total_SansAfgift,k = window,fill = NA,align = "left"),
                   window=window) %>% 
     dplyr::mutate(rollingsum=rollingsum/window) %>% 
     dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
@@ -288,9 +289,9 @@ min_forecast_day = max_forecast_day-days(7)
 
 lwr_upr = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total)) %>% 
+  dplyr::mutate(SpotPriceDKK_z=scale(SpotPriceDKK_Total_SansAfgift)) %>% 
   filter(SpotPriceDKK_z<=qnorm(p = 0.975) | SpotPriceDKK_z<=qnorm(p = 0.025)) %>% 
-  dplyr::summarise(lwr=min(SpotPriceDKK_Total),upr=max(SpotPriceDKK_Total))
+  dplyr::summarise(lwr=min(SpotPriceDKK_Total_SansAfgift),upr=max(SpotPriceDKK_Total_SansAfgift))
 
 lwr_upr_date = df %>% 
   filter(HourDK >= min_forecast_day) %>% 
@@ -299,7 +300,7 @@ lwr_upr_date = df %>%
 
 df %>% 
   filter(HourDK >= min_forecast_day) %>% 
-  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total)) +
+  ggplot(.,aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift)) +
   geom_line() +
   geom_line(aes(x=HourDK,y=SpotPriceDKK_Total_SansAfgift),linetype=3) +
   geom_hline(yintercept = 0) +
