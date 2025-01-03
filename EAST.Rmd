@@ -196,11 +196,21 @@ res %>%
 
 mean_sd = df %>% 
   filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
-    filter(hour(HourDK) >= 6) %>% 
-    filter(hour(HourDK) <= 17) %>% 
+    # filter(hour(HourDK) >= 6) %>% 
+    # filter(hour(HourDK) <= 17) %>% 
   dplyr::summarize(mean_=mean(SpotPriceDKK_Total_SansAfgift),sd_=sd(SpotPriceDKK_Total_SansAfgift))
 
 df_windows = lapply(seq(2,5),function(window) {
+  
+  look_up = data.frame(pct=seq(0,1,by=0.01),
+           value = df %>% 
+    filter(as.Date(HourDK)>=Sys.Date()-days(30)) %>% 
+    arrange(HourDK) %>% 
+    dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total_SansAfgift,k = window,fill = NA,align = "left"),
+                  window=window) %>% 
+    dplyr::mutate(rollingsum=rollingsum/window)  %>% 
+    pull(rollingsum) %>% 
+    quantile(.,seq(0,1,by=0.01),na.rm=T))
   
   df %>% 
     filter(HourDK >= Sys.time()) %>% 
@@ -210,8 +220,12 @@ df_windows = lapply(seq(2,5),function(window) {
     dplyr::mutate(rollingsum=zoo::rollsum(x = SpotPriceDKK_Total_SansAfgift,k = window,fill = NA,align = "left"),
                   window=window) %>% 
     dplyr::mutate(rollingsum=rollingsum/window) %>% 
-    dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
-  dplyr::mutate(p_label=scales::percent(p_norm,accuracy=1)) %>% 
+    filter(rollingsum==min(rollingsum,na.rm=T)) %>% 
+    # dplyr::mutate(p_norm=pnorm(rollingsum,mean=mean_sd$mean_,sd=mean_sd$sd_)) %>% 
+    tidyr::crossing(look_up) %>% 
+    filter(rollingsum>=value) %>% 
+    filter(pct==max(pct)) %>% 
+    dplyr::mutate(p_label=scales::percent(pct,accuracy=1)) %>% 
     na.omit
   
 })
@@ -223,7 +237,7 @@ p <- low(rollingsum) * high(window)
 # Calculate the level-value w.r.t. p by using top-all
 res_2 <- psel(df_windows, p, top = nrow(df_windows)) %>% filter(.level==min(.level))
 res_2 %>% 
-  dplyr::select(HourDK,.level,rollingsum,window,p_norm) %>% 
+  dplyr::select(HourDK,.level,rollingsum,window,pct) %>% 
   knitr::kable()
 
 
@@ -530,6 +544,27 @@ df %>%
 ```
 
 ## Time Windows
+
+```{r }
+
+df_predict_all_week = df %>% 
+  filter(HourDK >= Sys.Date()-months(6)) %>% 
+  dplyr::mutate(Hour = hour(HourDK),
+                Day = factor(paste0(wday(HourDK,label = TRUE)))) %>% 
+  dplyr::select(SpotPriceDKK_Total_SansAfgift,Hour,Day)
+
+train_control = caret::trainControl(method = "repeatedcv",number = 5,repeats = 5)
+fit_rpart = caret::train(y = df_predict_all_week$SpotPriceDKK_Total_SansAfgift,
+                         x = df_predict_all_week %>% dplyr::select(-SpotPriceDKK_Total_SansAfgift) %>% as.data.frame(),
+                         method = "rpart",
+                         tuneLength=50,
+                         metric = "RMSE",
+                         trControl = train_control)
+
+rpart.plot(fit_rpart$finalModel)
+rpart.rules(fit_rpart$finalModel)
+
+```
 
 ```{r }
 
