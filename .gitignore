@@ -1,6 +1,27 @@
+# R session files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
 
+# Secrets / environment variables
 Renviron.site
+.Renviron
+
+# renv library (tracked via renv.lock)
+renv/library/
+renv/staging/
+renv/python/
+renv/sandbox/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Bookdown output
+_book/
+_bookdown_files/
+libs/
+
+# OS files
+.DS_Store
+Thumbs.db
