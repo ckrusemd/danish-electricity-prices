@@ -1,0 +1,125 @@
+:root {
+  --ink: #17212b;
+  --muted: #52606d;
+  --surface: #f6f8fa;
+  --border: #d9e2ec;
+  --teal: #0f766e;
+  --blue: #2563eb;
+}
+
+body {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.book .book-body .page-wrapper .page-inner {
+  max-width: 1040px;
+}
+
+.book .book-header h1 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.publication-hero {
+  background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin: 1.5rem 0 2.5rem;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+}
+
+.eyebrow {
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.6rem;
+  text-transform: uppercase;
+}
+
+.publication-hero h2 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 1.1rem;
+  max-width: 700px;
+}
+
+.publication-actions {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 2rem;
+}
+
+.zone-card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  text-decoration: none;
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.zone-card:hover,
+.zone-card:focus-visible {
+  box-shadow: 0 8px 24px rgba(23, 33, 43, 0.12);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.zone-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 3px;
+}
+
+.zone-card-label,
+.zone-card-action {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.zone-card-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0.35rem 0 1rem;
+}
+
+.zone-card-east { border-top: 4px solid var(--teal); }
+.zone-card-west { border-top: 4px solid var(--blue); }
+
+.publication-note {
+  background: var(--surface);
+  border-left: 4px solid var(--teal);
+  margin: 2rem 0;
+  padding: 1rem 1.25rem;
+}
+
+.book .book-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  width: max-content;
+}
+
+@media (max-width: 640px) {
+  .publication-actions { grid-template-columns: 1fr; }
+  .publication-hero { border-radius: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zone-card { transition: none; }
+}

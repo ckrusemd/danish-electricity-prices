@@ -14,7 +14,42 @@ description: "Danish Electricity Prices"
 
 # Danish Electricity Prices
 
-Source: Energidataservice
+<div class="publication-hero" role="region" aria-labelledby="publication-title">
+
+<p class="eyebrow">Danish energy market monitor</p>
+
+<h2 id="publication-title">Find the best hours to use electricity</h2>
+
+<p class="lead">Daily spot-price analysis for the two Danish bidding zones, with upcoming prices, low-price windows, and historical context.</p>
+
+<div class="publication-actions">
+
+<a class="zone-card zone-card-east" href="east-denmark.html">
+<span class="zone-card-label">DK2</span>
+<span class="zone-card-title">East Denmark</span>
+<span class="zone-card-action">View prices&nbsp; →</span>
+</a>
+
+<a class="zone-card zone-card-west" href="west-denmark.html">
+<span class="zone-card-label">DK1</span>
+<span class="zone-card-title">West Denmark</span>
+<span class="zone-card-action">View prices&nbsp; →</span>
+</a>
+
+</div>
+</div>
+
+## About this publication
+
+The report uses hourly wholesale spot prices from the public
+[Energi Data Service Elspotprices API](https://api.energidataservice.dk/dataset/Elspotprices).
+Prices are shown in DKK/kWh. Any estimated consumer-price calculation is
+illustrative: grid tariffs depend on the distribution network and can change
+over time.
+
+The pages are regenerated automatically by GitHub Actions. This report was
+compiled `r format(Sys.time(), tz = "Europe/Copenhagen", format = "%Y-%m-%d %H:%M") `
+(Copenhagen time).
 
 ```{r include=FALSE}
 
@@ -36,4 +71,10 @@ print_danish_time = function() {
 
 ```
 
-This report was compiled `r print_danish_time() `.
+<div class="publication-note">
+
+**Reading the charts:** use the tables as the precise source for recommended
+hours; charts provide the broader pattern. Prices can change as new market data
+becomes available.
+
+</div>
