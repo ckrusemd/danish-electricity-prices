@@ -5,8 +5,9 @@ uploads `_site` as a Pages artifact, and deploys it to the `github-pages`
 environment. It runs daily, on relevant changes to `master`, and manually.
 
 `security.yml` runs on pushes, pull requests, and manual dispatch. It scans all
-reachable Git history for common secret formats and checks required project files
-and shared R syntax.
+reachable Git history for common secret formats and checks required project files.
+R syntax is validated during the deployment build after the R environment has
+been installed.
 
 ## Required settings
 
