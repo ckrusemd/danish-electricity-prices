@@ -6,7 +6,7 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 
 ## Features
 
-- Fetches hourly spot prices from the [Energidataservice API](https://www.energidataservice.dk/)
+- Fetches current day-ahead prices from the [Energi Data Service API](https://www.energidataservice.dk/)
 - Calculates total consumer price including transport tariffs and electricity tax (*elafgift*)
 - Finds the cheapest upcoming hours and rolling time windows (2–3 hours)
 - Builds a decision-tree model (rpart) to predict price levels by day-of-week and hour
@@ -83,7 +83,7 @@ not present stale prices as current data.
 
 ## Data Source
 
-All electricity price data comes from the public [Energidataservice Elspotprices API](https://api.energidataservice.dk/dataset/Elspotprices) — no API key required. The site reports wholesale spot prices separately from any estimated consumer-price calculation because grid tariffs depend on the distribution network and can change over time.
+All electricity price data comes from the public [Energi Data Service DayAheadPrices API](https://api.energidataservice.dk/dataset/DayAheadPrices) — no API key required. The site normalizes the current 15-minute market data to hourly values for the legacy Bookdown charts. The site reports wholesale spot prices separately from any estimated consumer-price calculation because grid tariffs depend on the distribution network and can change over time.
 
 ## License
 

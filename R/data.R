@@ -2,7 +2,7 @@
 
 fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
   price_area <- match.arg(price_area)
-  endpoint <- "https://api.energidataservice.dk/dataset/Elspotprices"
+  endpoint <- "https://api.energidataservice.dk/dataset/DayAheadPrices"
 
   response <- httr::RETRY(
     "GET",
@@ -10,7 +10,9 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
     query = list(
       offset = 0,
       filter = jsonlite::toJSON(list(PriceArea = list(price_area)), auto_unbox = TRUE),
-      sort = "HourUTC DESC",
+      start = "now-P2D",
+      end = "now+P2D",
+      sort = "TimeUTC DESC",
       timezone = "dk",
       limit = limit
     ),
@@ -22,24 +24,31 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
 
   payload <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"))
   records <- payload$records
-  required <- c("HourDK", "HourUTC", "PriceArea", "SpotPriceDKK", "SpotPriceEUR")
+  required <- c("TimeDK", "TimeUTC", "PriceArea", "DayAheadPriceDKK", "DayAheadPriceEUR")
 
   if (!is.data.frame(records) || !all(required %in% names(records))) {
-    stop("Elspotprices response is missing required columns: ",
+    stop("DayAheadPrices response is missing required columns: ",
          paste(setdiff(required, names(records)), collapse = ", "))
   }
-  if (!nrow(records)) stop("Elspotprices returned no records for ", price_area)
+  if (!nrow(records)) stop("DayAheadPrices returned no records for ", price_area)
 
   result <- records |>
     dplyr::filter(.data$PriceArea == price_area) |>
     dplyr::mutate(
-      HourDK = lubridate::ymd_hms(.data$HourDK, tz = "Europe/Copenhagen"),
-      SpotPriceDKK = .data$SpotPriceDKK / 1000,
-      SpotPriceEUR = .data$SpotPriceEUR / 1000
+      TimeDK = lubridate::ymd_hms(.data$TimeDK, tz = "Europe/Copenhagen"),
+      SpotPriceDKK = .data$DayAheadPriceDKK / 1000,
+      SpotPriceEUR = .data$DayAheadPriceEUR / 1000,
+      HourDK = lubridate::floor_date(.data$TimeDK, "hour")
+    ) |>
+    dplyr::group_by(.data$HourDK, .data$PriceArea) |>
+    dplyr::summarise(
+      SpotPriceDKK = mean(.data$SpotPriceDKK, na.rm = TRUE),
+      SpotPriceEUR = mean(.data$SpotPriceEUR, na.rm = TRUE),
+      .groups = "drop"
     ) |>
     dplyr::arrange(.data$HourDK)
 
-  if (any(is.na(result$HourDK))) stop("Elspotprices contains invalid timestamps")
-  if (!any(result$HourDK >= Sys.time())) stop("Elspotprices contains no future prices")
+  if (any(is.na(result$HourDK))) stop("DayAheadPrices contains invalid timestamps")
+  if (!any(result$HourDK >= Sys.time())) stop("DayAheadPrices contains no future prices")
   result
 }
