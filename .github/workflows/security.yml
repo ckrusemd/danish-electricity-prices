@@ -1,0 +1,22 @@
+name: Security checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan repository and history for secrets
+        run: bash scripts/secret-scan.sh

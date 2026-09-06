@@ -15,19 +15,15 @@ pacman::p_load(tidyr,
                ggplot2,
                httr,
                rpart.plot,
-               pushoverr,
                caret,
                zoo,
                glue,
                rPref,
                lubridate)
+source("R/data.R")
 ```
 
 ```{r warning=FALSE,message=FALSE,include=FALSE}
-readRenviron(path = "Renviron.site")
-pushoverr::set_pushover_app(token = Sys.getenv("PUSHOVER_APPKEY"))
-pushoverr::set_pushover_user(user = Sys.getenv("PUSHOVER_USERKEY"))
-
 ```
 
 
@@ -35,18 +31,7 @@ pushoverr::set_pushover_user(user = Sys.getenv("PUSHOVER_USERKEY"))
 
 # api_url = 'https://api.energidataservice.dk/datastore_search_sql?sql=SELECT "HourDK","SpotPriceDKK","SpotPriceEUR" FROM "elspotprices" WHERE "PriceArea"=\'DK2\' ORDER BY "HourDK" DESC LIMIT 30000'
 # api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&filter=%7B%22PriceArea%22:[%22DK2%22]%7D&sort=HourUTC%20DESC&timezone=dk&limit=35000"
-api_url = "https://api.energidataservice.dk/dataset/Elspotprices?offset=0&sort=HourUTC%20DESC&timezone=dk&limit=50000"
-
-
-api_url = utils::URLencode(api_url)
-api_result = httr::GET(api_url)
-api_json = rawToChar(api_result$content)
-df <- jsonlite::fromJSON(api_json)$records
-df = df %>% 
-  filter(PriceArea=="DK2") %>% 
-  dplyr::mutate(HourDK=ymd_hms(HourDK,tz = "Europe/Copenhagen"),
-                SpotPriceDKK=SpotPriceDKK/1000,
-                SpotPriceEUR=SpotPriceEUR/1000) %>% 
+df <- fetch_elspot_prices("DK2", limit = 10000) %>%
   dplyr::mutate(ExchangeRate=SpotPriceDKK/SpotPriceEUR) %>% 
   dplyr::mutate(SpotPriceDKK=ifelse(is.na(SpotPriceDKK),SpotPriceEUR*7.43988,SpotPriceDKK)) %>% 
   # Radius nettarif per 30. september 2023, moms 20%, afgift 87.13 ører.

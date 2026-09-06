@@ -1,0 +1,50 @@
+name: Build and deploy electricity prices
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "17 16 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.3.3"
+      - name: Restore R packages
+        uses: r-lib/actions/setup-renv@v2
+      - name: Render site
+        run: Rscript -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

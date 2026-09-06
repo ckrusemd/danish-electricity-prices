@@ -9,7 +9,6 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 - Fetches hourly spot prices from the [Energidataservice API](https://www.energidataservice.dk/)
 - Calculates total consumer price including transport tariffs and electricity tax (*elafgift*)
 - Finds the cheapest upcoming hours and rolling time windows (2–3 hours)
-- Sends push notifications via [Pushover](https://pushover.net/) with price forecasts
 - Builds a decision-tree model (rpart) to predict price levels by day-of-week and hour
 
 ## Project Structure
@@ -23,10 +22,16 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 ├── EAST_new.ipynb       # Experimental notebook (East)
 ├── EAST_new_complete.ipynb
 ├── test_ir_fixed.ipynb
-├── Renviron.site        # Environment variables (git-ignored)
 ├── renv.lock            # R package lockfile (renv)
 └── .github/workflows/   # CI/CD — build & deploy to GitHub Pages
 ```
+
+## Deployment
+
+The site is built and deployed daily by GitHub Actions and can also be run manually
+from the Actions tab. The repository is intended to be public so standard GitHub
+Actions runners and GitHub Pages remain free. No API key or application secrets are
+required.
 
 ## Setup
 
@@ -44,22 +49,15 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
    renv::restore()
    ```
 
-3. Create a `Renviron.site` file in the project root with your Pushover credentials:
-
-   ```
-   PUSHOVER_APPKEY=your_app_token
-   PUSHOVER_USERKEY=your_user_key
-   ```
-
-4. Render the book:
+3. Render the book:
 
    ```r
-   bookdown::render_book("index.Rmd")
+   bookdown::render_book("index.Rmd", output_dir = "_site")
    ```
 
 ## Data Source
 
-All electricity price data comes from the public [Energidataservice Elspotprices API](https://api.energidataservice.dk/dataset/Elspotprices) — no API key required.
+All electricity price data comes from the public [Energidataservice Elspotprices API](https://api.energidataservice.dk/dataset/Elspotprices) — no API key required. The site reports wholesale spot prices separately from any estimated consumer-price calculation because grid tariffs depend on the distribution network and can change over time.
 
 ## License
 

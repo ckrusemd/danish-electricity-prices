@@ -18,8 +18,8 @@ Source: Energidataservice
 
 ```{r include=FALSE}
 
-if (!require(pacman)) { install.packages("pacman") }
-pacman::p_load( lubridate , scales , fredr )
+library(lubridate)
+library(scales)
 
 # automatically create a bib database for R packages
 knitr::write_bib(c(
@@ -29,9 +29,9 @@ knitr::write_bib(c(
 options(scipen=999)
 
 print_danish_time = function() {
-  time = lubridate::with_tz(Sys.time(), "CET")
+  time = lubridate::with_tz(Sys.time(), "Europe/Copenhagen")
   
-  paste0( strftime(time,tz="CET",format="%A %b")," ",scales::ordinal_format()(lubridate::day(time))," ",strftime(time,tz="CET",format="%Y %H:%M")," ",lubridate::tz(time))
+  paste0( strftime(time,tz="Europe/Copenhagen",format="%A %b")," ",scales::ordinal_format()(lubridate::day(time))," ",strftime(time,tz="Europe/Copenhagen",format="%Y %H:%M")," ",lubridate::tz(time))
 }
 
 ```
