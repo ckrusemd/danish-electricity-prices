@@ -1,0 +1,11 @@
+.git
+.github
+_site
+renv/library
+renv/staging
+*.html
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.log
