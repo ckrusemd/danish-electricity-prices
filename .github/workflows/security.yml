@@ -15,8 +15,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out repository history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Scan repository and history for secrets
         run: bash scripts/secret-scan.sh
+      - name: Validate repository files
+        run: |
+          test -f .github/workflows/deploy-pages.yml
+          test -f .github/dependabot.yml
+          test -f renv.lock
+          test -f _bookdown.yml
+          git diff --check
+      - name: Validate shared R code
+        run: Rscript --vanilla -e 'parse(file = "R/data.R")'

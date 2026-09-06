@@ -26,12 +26,26 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 └── .github/workflows/   # CI/CD — build & deploy to GitHub Pages
 ```
 
-## Deployment
+## GitHub Actions and deployment
 
-The site is built and deployed daily by GitHub Actions and can also be run manually
-from the Actions tab. The repository is intended to be public so standard GitHub
-Actions runners and GitHub Pages remain free. No API key or application secrets are
-required.
+The repository uses two workflows:
+
+- **Build and deploy electricity prices** restores the locked R environment,
+  renders the site, and publishes it to GitHub Pages. It runs daily at 16:17
+  UTC, on relevant source changes to `master`, or manually through **Actions →
+  Run workflow**.
+- **Security checks** scans the working tree and full Git history for common
+  credentials and validates the repository configuration on pushes and pull
+  requests.
+
+Set **Settings → Pages → Source** to **GitHub Actions**. The deployment uses
+standard runners and public GitHub Pages, so it requires no paid infrastructure
+or application secrets. The R package cache is keyed from `renv.lock`; changing
+that file automatically creates a fresh dependency cache.
+
+If a scheduled build fails, open the failed run under **Actions**, inspect the
+first error, correct it, and use **Run workflow**. A successful build must
+complete before Pages is updated.
 
 ## Setup
 
