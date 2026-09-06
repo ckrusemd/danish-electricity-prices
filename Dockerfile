@@ -1,0 +1,26 @@
+FROM rocker/r-ver:4.3.3
+
+LABEL org.opencontainers.image.source="https://github.com/ckrusemd/danish-electricity-prices"
+LABEL org.opencontainers.image.description="Locked R environment for the Danish electricity prices publication"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    RENV_CONFIG_REPOS_OVERRIDE=https://cloud.r-project.org \
+    RENV_PATHS_CACHE=/renv/cache
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        libcurl4-openssl-dev \
+        libglpk-dev \
+        pandoc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /project
+
+COPY renv.lock renv.lock
+COPY renv/settings.json renv/settings.json
+COPY renv/activate.R renv/activate.R
+COPY .Rprofile .Rprofile
+
+RUN Rscript --vanilla -e 'install.packages("renv"); renv::restore(lockfile = "renv.lock", prompt = FALSE)'
+
+CMD ["Rscript", "--vanilla"]

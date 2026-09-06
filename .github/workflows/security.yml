@@ -23,6 +23,9 @@ jobs:
       - name: Validate repository files
         run: |
           test -f .github/workflows/deploy-pages.yml
+          test -f .github/workflows/build-container.yml
+          test -f Dockerfile
+          test -f .dockerignore
           test -f .github/dependabot.yml
           test -f renv.lock
           test -f _bookdown.yml
