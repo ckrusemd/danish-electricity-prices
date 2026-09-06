@@ -38,6 +38,8 @@ jobs:
           test -f renv.lock
           test -f _bookdown.yml
           test -f index.Rmd
+      - name: Validate shared R code
+        run: Rscript --vanilla -e 'parse(file = "R/data.R")'
       - name: Render site
         run: Rscript -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
       - name: Upload Pages artifact

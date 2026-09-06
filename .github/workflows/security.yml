@@ -27,5 +27,5 @@ jobs:
           test -f renv.lock
           test -f _bookdown.yml
           git diff --check
-      - name: Validate shared R code
-        run: Rscript --vanilla -e 'parse(file = "R/data.R")'
+      - name: Validate shared R source is present
+        run: test -s R/data.R
