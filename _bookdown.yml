@@ -1,7 +1,17 @@
 rmd_files: ["index.Rmd","EAST.Rmd","WEST.Rmd"]
+book_filename: "danish-electricity-prices"
+split_by: section
 output:
   bookdown::gitbook:
+    css: style.css
     lib_dir: "_book"
+    includes:
+      in_header: header.html
+    config:
+      toc:
+        collapse: subsection
+      toolbar:
+        position: static
   bookdown::pdf_book:
     keep_tex: yes
   pdf_document:
