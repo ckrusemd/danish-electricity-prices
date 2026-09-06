@@ -18,10 +18,8 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 ├── EAST.Rmd             # Analysis for East Denmark (DK2)
 ├── WEST.Rmd             # Analysis for West Denmark (DK1)
 ├── _bookdown.yml        # Bookdown configuration
-├── EAST.ipynb           # Jupyter notebook version (East)
-├── EAST_new.ipynb       # Experimental notebook (East)
-├── EAST_new_complete.ipynb
-├── test_ir_fixed.ipynb
+├── EAST.ipynb            # 15-minute Jupyter analysis for DK2
+├── WEST.ipynb            # Adapted 15-minute Jupyter analysis for DK1
 ├── renv.lock            # R package lockfile (renv)
 └── .github/workflows/   # CI/CD — build & deploy to GitHub Pages
 ```
@@ -67,6 +65,20 @@ complete before Pages is updated.
 
    ```r
    bookdown::render_book("index.Rmd", output_dir = "_site")
+
+## Notebooks
+
+The repository contains one notebook per Danish bidding zone:
+
+- `EAST.ipynb` covers DK2 (East Denmark).
+- `WEST.ipynb` covers DK1 (West Denmark) and is adapted from the EAST analysis
+  so both notebooks use the same calculations and presentation.
+
+The notebooks are companion analyses; the Bookdown R Markdown files remain the
+authoritative GitHub Pages publication. Restore the `renv` environment before
+opening either notebook, and rerun the data cells when you need fresh prices.
+Notebook outputs are intentionally cleared from version control so the files do
+not present stale prices as current data.
    ```
 
 ## Data Source
