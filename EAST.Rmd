@@ -695,23 +695,3 @@ expand.grid(kwh=seq(100*31)) %>%
   geom_line() +
   labs(title="Monthly afgift by monthly kWh")
 ```
-
-# Send message
-
-
-```{r}
-
-tmp_dir = tempdir()
-ggsave(filename = paste0(tmp_dir,"/p1.jpg"),plot = p1,device = "jpeg")
-pushoverr::pushover(message = "Electricity Forecast",attachment = paste0(tmp_dir,"/p1.jpg"))
-
-# Best windows
-msg_ = res %>% 
-  dplyr::mutate(diff_hours=as.numeric(difftime(HourDK,as.POSIXct(Sys.Date()+hours(6),tz="Europe/Copenhagen"),units = "mins"))/60) %>% 
-  dplyr::mutate(label_=glue("{window}H Window: {hour(HourDK)}:00 - {scales::number(rollingsum,accuracy=0.001)} DKK ({p_label}), Delay: {diff_hours}")) %>% 
-  pull(label_) %>% 
-  paste(.,collapse="\n")
-msg_ = paste0("ELECTRICITY BEST WINDOWS:\n",msg_)
-pushoverr::pushover(message = msg_)
-
-```
