@@ -14,6 +14,7 @@ RUN apt-get update \
         libssl-dev \
         pkg-config \
         pandoc \
+        pandoc-citeproc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /project
