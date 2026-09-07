@@ -26,20 +26,24 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 
 ## GitHub Actions and deployment
 
-The repository uses two workflows:
+The repository uses three workflows:
 
-- **Build and deploy electricity prices** restores the locked R environment,
-  renders the site, and publishes it to GitHub Pages. It runs daily at 16:17
+- **Build and deploy electricity prices** renders the site in a prebuilt
+  R/Pandoc container and publishes it to GitHub Pages. It runs daily at 16:17
   UTC, on relevant source changes to `master`, or manually through **Actions →
   Run workflow**.
+- **Build R publication container** rebuilds the public GHCR image when the R
+  lockfile or container definition changes. This moves the slow package restore
+  out of every scheduled publication run.
 - **Security checks** scans the working tree and full Git history for common
   credentials and validates the repository configuration on pushes and pull
   requests.
 
 Set **Settings → Pages → Source** to **GitHub Actions**. The deployment uses
 standard runners and public GitHub Pages, so it requires no paid infrastructure
-or application secrets. The R package cache is keyed from `renv.lock`; changing
-that file automatically creates a fresh dependency cache.
+or application secrets. The publication image is built from R 4.3.3, Pandoc, and
+`renv.lock`. Changing the lockfile starts the container workflow; wait for it
+to complete before running publication.
 
 If a scheduled build fails, open the failed run under **Actions**, inspect the
 first error, correct it, and use **Run workflow**. A successful build must

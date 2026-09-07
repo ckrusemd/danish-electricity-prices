@@ -7,8 +7,10 @@ on:
     paths:
       - "**.R"
       - "**.Rmd"
-      - "renv.lock"
       - "_bookdown.yml"
+      - "style.css"
+      - "header.html"
+      - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
     - cron: "17 16 * * *"
@@ -24,21 +26,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
+      options: --user root
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: renv
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libcurl4-openssl-dev libglpk-dev
-      - name: Set up Pandoc
-        uses: r-lib/actions/setup-pandoc@v2
-      - name: Restore R packages
-        uses: r-lib/actions/setup-renv@v2
       - name: Check repository configuration
         run: |
           test -f renv.lock
@@ -47,7 +40,8 @@ jobs:
       - name: Validate shared R code
         run: Rscript --vanilla -e 'parse(file = "R/data.R")'
       - name: Render site
-        run: Rscript -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
+        run: |
+          time Rscript --vanilla -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
