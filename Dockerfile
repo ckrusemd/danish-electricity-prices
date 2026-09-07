@@ -11,6 +11,8 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         libcurl4-openssl-dev \
         libglpk-dev \
+        libssl-dev \
+        pkg-config \
         pandoc \
     && rm -rf /var/lib/apt/lists/*
 
