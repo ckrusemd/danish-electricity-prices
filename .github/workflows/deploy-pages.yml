@@ -40,8 +40,7 @@ jobs:
       - name: Validate shared R code
         run: Rscript --vanilla -e 'parse(file = "R/data.R")'
       - name: Render site
-        run: |
-          time Rscript --vanilla -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
+        run: Rscript --vanilla -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
