@@ -21,6 +21,8 @@ pacman::p_load(tidyr,
                rPref,
                lubridate)
 source("R/data.R")
+source("R/plot-theme.R")
+knitr::opts_chunk$set(fig.width = 10, fig.height = 5.5, dpi = 144)
 ```
 
 ```{r warning=FALSE,message=FALSE,include=FALSE}
@@ -86,7 +88,7 @@ p1 = df %>%
   geom_hline(yintercept = 0) +
   # scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
@@ -119,7 +121,7 @@ p2 = df %>%
   # geom_hline(yintercept = 0) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
   scale_y_continuous(limits=c(-0.5,NA),breaks = seq(-1,10,by=0.25)) +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
@@ -244,7 +246,7 @@ df %>%
   # geom_hline(yintercept = 0) +
   scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 hour",date_labels = "%H") +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   # geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7)  +
   labs(title="Lowest Upcoming Prices",
@@ -271,7 +273,7 @@ df %>%
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%a %b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
-  theme_bw() +
+  plot_theme() +
   geom_text(aes(label=scales::number(SpotPriceDKK_Total,accuracy = 0.01)))  +
   labs(title="Previous Week and Upcoming Prices",
        subtitle="East Denmark",
@@ -305,7 +307,7 @@ df %>%
   geom_hline(yintercept = 0) +
   scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
   geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA)  +
@@ -396,7 +398,7 @@ df %>%
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "7 day",date_labels = "%b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
-  theme_bw()  +
+  plot_theme()  +
   labs(title="Previous Month and Upcoming Prices",
        subtitle="East Denmark",
        x="Day",
@@ -420,7 +422,7 @@ df %>%
   scale_fill_gradient(low = "green",high = "red") +
   scale_x_datetime(date_breaks = "7 day",date_labels = "%b %d") +
   scale_y_continuous(breaks = seq(0,23,by=1),labels = paste0(seq(0,23,by=1)," - ",seq(1,24,by=1))) +
-  theme_bw()  +
+  plot_theme()  +
   labs(title="Previous Month and Upcoming Prices",
        subtitle="East Denmark",
        x="Day",
@@ -445,7 +447,7 @@ df %>%
   geom_boxplot() +
   # geom_violin() +
   scale_y_continuous(breaks = seq(0,10,by=0.25)) +
-  theme_bw()  +
+  plot_theme()  +
   labs(title="Prices by Hour",
        subtitle="East Denmark",
        x="Day",
@@ -477,7 +479,7 @@ df %>%
   geom_hline(yintercept = 0) +
   scale_y_continuous(limits=c(-1,NA),breaks = seq(-1,10,by=0.25)) +
   scale_x_datetime(date_breaks = "1 day",date_labels = "%d") +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
   geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA) +
@@ -515,7 +517,7 @@ df %>%
   geom_smooth() +
   scale_x_datetime(date_breaks = "1 month",date_labels = "%b") +
   scale_y_continuous(limits=c(0,NA),breaks = seq(0,10,by=0.25)) +
-  theme_bw() +
+  plot_theme() +
   theme(axis.text.x=element_text(angle=45,hjust=1)) +
   geom_vline(xintercept = Sys.time(),linetype=2,alpha=0.7) +
   geom_rect(xmin = lwr_upr_date$lwr,xmax = lwr_upr_date$upr,ymin = lwr_upr$lwr,ymax = lwr_upr$upr,color="red",fill=NA) +
