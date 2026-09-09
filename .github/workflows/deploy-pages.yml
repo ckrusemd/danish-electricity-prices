@@ -13,7 +13,10 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    - cron: "17 16 * * *"
+    # GitHub cron is UTC. These two triggers cover CET and CEST; the gate
+    # below allows only the trigger that corresponds to 06:00 Copenhagen time.
+    - cron: "0 4 * * *"
+    - cron: "0 5 * * *"
 
 permissions:
   contents: read
@@ -23,7 +26,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  schedule-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - name: Check Copenhagen schedule
+        id: gate
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(TZ=Europe/Copenhagen date +%H)" = "06" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: schedule-gate
+    if: needs.schedule-gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
