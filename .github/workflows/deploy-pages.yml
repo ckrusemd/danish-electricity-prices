@@ -14,7 +14,7 @@ on:
       - ".github/workflows/deploy-pages.yml"
   schedule:
     # GitHub cron is UTC. These two triggers cover CET and CEST; the gate
-    # below allows only the trigger that corresponds to 06:00 Copenhagen time.
+    # below selects the trigger for the current Copenhagen offset.
     - cron: "0 4 * * *"
     - cron: "0 5 * * *"
 
@@ -35,7 +35,10 @@ jobs:
         id: gate
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(TZ=Europe/Copenhagen date +%H)" = "06" ]; then
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif { [ "${{ github.event.schedule }}" = "0 4 * * *" ] && [ "$(TZ=Europe/Copenhagen date +%Z)" = "CEST" ]; } || \
+               { [ "${{ github.event.schedule }}" = "0 5 * * *" ] && [ "$(TZ=Europe/Copenhagen date +%Z)" = "CET" ]; }; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
