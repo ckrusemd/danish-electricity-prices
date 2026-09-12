@@ -13,8 +13,9 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    # GitHub cron is UTC. These two triggers cover CET and CEST; the gate
-    # below selects the trigger for the current Copenhagen offset.
+    # GitHub cron is UTC. The three triggers cover 05:00 and 06:00
+    # Copenhagen time across CET/CEST; the gate selects the right job.
+    - cron: "0 3 * * *"
     - cron: "0 4 * * *"
     - cron: "0 5 * * *"
 
@@ -29,24 +30,36 @@ jobs:
   schedule-gate:
     runs-on: ubuntu-latest
     outputs:
-      run: ${{ steps.gate.outputs.run }}
+      deploy: ${{ steps.gate.outputs.deploy }}
+      notify: ${{ steps.gate.outputs.notify }}
     steps:
       - name: Check Copenhagen schedule
         id: gate
         shell: bash
         run: |
           if [ "${{ github.event_name }}" != "schedule" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          elif { [ "${{ github.event.schedule }}" = "0 4 * * *" ] && [ "$(TZ=Europe/Copenhagen date +%Z)" = "CEST" ]; } || \
-               { [ "${{ github.event.schedule }}" = "0 5 * * *" ] && [ "$(TZ=Europe/Copenhagen date +%Z)" = "CET" ]; }; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "notify=false" >> "$GITHUB_OUTPUT"
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"
+            deploy=false
+            notify=false
+            zone=$(TZ=Europe/Copenhagen date +%Z)
+            schedule="${{ github.event.schedule }}"
+            if { [ "$schedule" = "0 4 * * *" ] && [ "$zone" = "CEST" ]; } || \
+               { [ "$schedule" = "0 5 * * *" ] && [ "$zone" = "CET" ]; }; then
+              deploy=true
+            fi
+            if { [ "$schedule" = "0 3 * * *" ] && [ "$zone" = "CEST" ]; } || \
+               { [ "$schedule" = "0 4 * * *" ] && [ "$zone" = "CET" ]; }; then
+              notify=true
+            fi
+            echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+            echo "notify=$notify" >> "$GITHUB_OUTPUT"
           fi
 
   build:
     needs: schedule-gate
-    if: needs.schedule-gate.outputs.run == 'true'
+    if: needs.schedule-gate.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
@@ -85,3 +98,20 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  notify:
+    needs: schedule-gate
+    if: needs.schedule-gate.outputs.notify == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
+      options: --user root
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Send Pushover notification
+        env:
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: Rscript --vanilla scripts/send-pushover.R
