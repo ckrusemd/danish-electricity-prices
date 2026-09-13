@@ -45,7 +45,7 @@ The report uses hourly wholesale spot prices from the public
 [Energi Data Service Elspotprices API](https://api.energidataservice.dk/dataset/Elspotprices).
 Prices are shown in DKK/kWh. Consumer-price calculations use the current 2026
 components for a private customer in Copenhagen with Radius as grid operator
-and Andel Energi TimeEnergi as supplier. See the full [price-component
+and Andel Energi FlexEnergi as supplier. See the full [price-component
 documentation](price-components.html); tariffs and supplier add-ons can change.
 
 The pages are regenerated automatically by GitHub Actions. This report was

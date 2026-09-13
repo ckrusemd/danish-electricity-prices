@@ -1,12 +1,8 @@
 # 2026 consumer-price components for a private C customer in Radius' area
-# with an existing Andel Energi TimeEnergi agreement. TimeEnergi is a legacy
-# product; confirm its account-specific surcharge on the bill.
+# with an Andel Energi FlexEnergi agreement.
 
-andel_timeenergi_spottillaeg_oere <- function() {
-  configured <- Sys.getenv("ANDEL_TIMEENERGI_SPOTTILLAEG_OERE", "14.63")
-  value <- suppressWarnings(as.numeric(configured))
-  if (!is.finite(value) || value < 0) stop("ANDEL_TIMEENERGI_SPOTTILLAEG_OERE must be non-negative", call. = FALSE)
-  value
+andel_flexenergi_spottillaeg_oere <- function() {
+  14.63
 }
 
 radius_tariff_incl_vat <- function(time) {
@@ -28,7 +24,7 @@ apply_consumer_price_components <- function(data, spot_col = "SpotPriceDKK") {
       transport = .data$RadiusNettarifInclMoms / 1.25,
       elafgift = 0.80,
       EnerginetTarif = 7.20 + 4.30,
-      AndelPristillaeg = andel_timeenergi_spottillaeg_oere(),
+      AndelPristillaeg = andel_flexenergi_spottillaeg_oere(),
       SpotPriceDKK_Total = 1.25 * (.data[[spot_col]] + .data$transport / 100 +
         .data$elafgift / 100 + .data$EnerginetTarif / 100) + .data$AndelPristillaeg / 100,
       SpotPriceDKK_Total_SansAfgift = 1.25 * (.data[[spot_col]] + .data$transport / 100 +

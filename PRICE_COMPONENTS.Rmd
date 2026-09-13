@@ -7,13 +7,13 @@ date: "`r Sys.Date()`"
 # København: Andel Energi og Radius
 
 Rapportens forbrugerpris er sat op for en privatkunde i kundekategori C i
-Radius Elnets område med en eksisterende Andel Energi TimeEnergi-aftale. Satserne gælder for 2026 og
+Radius Elnets område med en Andel Energi FlexEnergi-aftale. Satserne gælder for 2026 og
 er inklusive moms, medmindre andet er angivet.
 
 | Komponent | Sats | Behandling |
 |---|---:|---|
 | Spotpris DK2 | Variabel | Rå timepris fra Energi Data Service/Nord Pool-området |
-| Andel TimeEnergi-spottillæg | 14,63 øre/kWh som standard* | Kontoafhængigt tillæg; kontrollér regningen |
+| Andel FlexEnergi-spottillæg | 14,63 øre/kWh | Offentliggjort pristillæg |
 | Andel elabonnement | 20,00 kr./md. | Fast leverandørabonnement |
 | Radius nettarif 00–06 | 13,27 sommer / 12,20 vinter øre/kWh | April–september / oktober–marts |
 | Radius nettarif 06–17 og 21–24 | 19,91 sommer / 36,61 vinter øre/kWh | Transport gennem Radius’ net |
@@ -29,10 +29,9 @@ nettarif, Energinets variable tariffer og elafgift. Faste abonnementer fordeles
 ikke ud på kWh. Radius- og Energinet-abonnementerne svarer samlet til cirka
 70,52 kr./md. i Andels priseksempel.
 
-* TimeEnergi er en ældre aftale, som Andel ikke længere tilbyder til nye
-kunder. Den konkrete spottillægssats skal aflæses på aftalen eller regningen.
-Modellen bruger 14,63 øre/kWh som standard; sæt
-`ANDEL_TIMEENERGI_SPOTTILLAEG_OERE` for at bruge den faktiske sats.
+Jeres oplyste regning viser 19 kr./md. i Andel-abonnement. Modellen viser den
+offentliggjorte FlexEnergi-sats på 20 kr./md. for 2026; kontrollér næste regning
+efter prisændringen 1. august 2026.
 
 Kundeprodukter, betalingsgebyrer, stikledningsabonnement, solcelle-
 egenproducentbidrag og særlige Radius-gebyrer afhænger af den konkrete aftale

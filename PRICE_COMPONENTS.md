@@ -1,13 +1,13 @@
 # Aktuelle pris-komponenter: København, Andel Energi og Radius
 
 Rapportens forbrugerpris er sat op for en privatkunde i kundekategori C i
-Radius Elnets område med en eksisterende Andel Energi TimeEnergi-aftale. Satserne gælder for 2026 og
+Radius Elnets område med en Andel Energi FlexEnergi-aftale. Satserne gælder for 2026 og
 er inklusive moms, medmindre andet er angivet.
 
 | Komponent | Sats | Behandling |
 |---|---:|---|
 | Spotpris DK2 | Variabel | Rå timepris fra Energi Data Service/Nord Pool-området |
-| Andel TimeEnergi-spottillæg | 14,63 øre/kWh som standard* | Kontoafhængigt tillæg; kontrollér regningen |
+| Andel FlexEnergi-spottillæg | 14,63 øre/kWh | Offentliggjort pristillæg |
 | Andel elabonnement | 20,00 kr./md. | Fast leverandørabonnement |
 | Radius nettarif 00–06 | 13,27 sommer / 12,20 vinter øre/kWh | Sommer april–september; vinter oktober–marts |
 | Radius nettarif 06–17 og 21–24 | 19,91 sommer / 36,61 vinter øre/kWh | Transport gennem Radius’ net |
@@ -24,11 +24,9 @@ abonnementer holdes separat og fordeles ikke på kWh. Andel opkræver normalt
 Radius- og Energinet-beløbene samlet; Radius plus Energinet svarer i Andels
 priseksempel til ca. 70,52 kr./md.
 
-* TimeEnergi er en ældre aftale, som Andel ikke længere tilbyder til nye
-kunder. Andel viser den historiske TimeEnergi-pristillægssats i prisudviklingen,
-men den konkrete kundesats skal kontrolleres på aftalen eller regningen. Modellen
-bruger 14,63 øre/kWh som standard; sæt `ANDEL_TIMEENERGI_SPOTTILLAEG_OERE` for
-at anvende den faktiske sats.
+Jeres oplyste regning viser 19 kr./md. i Andel-abonnement. Modellen viser den
+offentliggjorte FlexEnergi-sats på 20 kr./md. for 2026; kontrollér næste regning
+efter prisændringen 1. august 2026.
 
 Kundeprodukter, betalingsgebyrer, stikledningsabonnement, solcelle-
 egenproducentbidrag og særlige Radius-gebyrer er ikke medtaget, fordi de
@@ -36,7 +34,7 @@ afhænger af den konkrete aftale eller installation.
 
 Kilder (tilgået 13. september 2026): [Radius priser](https://radiuselnet.dk/priser/),
 [Radius 2026-tariffer](https://radiuselnet.dk/radius-haever-tarifferne/),
-[Andel TimeEnergi](https://andelenergi.dk/el/timeenergi/),
+[Andel FlexEnergi](https://andelenergi.dk/el/flexenergi/),
 [Andels prisudvikling](https://andelenergi.dk/el/prisudvikling/),
 [Andels tarifoversigt](https://andelenergi.dk/kundeservice/aftaler-og-priser/nye-tariffer-for-el/),
 [Energinets tarifkatalog 2026](https://energinet.dk/media/ikylsqle/energinets_tarifkatalog_2026.pdf),
