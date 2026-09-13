@@ -42,9 +42,19 @@ prices <- bind_rows(
   rename(ConsumerPriceDKK = SpotPriceDKK_Total) %>%
   mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600)
 
-heatpump_data <- prices %>%
-  inner_join(weather, by = "HourKey") %>%
-  arrange(PriceArea, HourDK)
+candidate_offsets <- c(0, -1, 1, -2, 2, -24, 24)
+candidate_matches <- lapply(candidate_offsets, function(offset) {
+  weather %>%
+    mutate(HourKey = HourKey + offset) %>%
+    inner_join(prices, by = "HourKey") %>%
+    arrange(PriceArea, HourDK)
+})
+match_counts <- vapply(candidate_matches, nrow, integer(1))
+heatpump_data <- candidate_matches[[which.max(match_counts)]]
+if (!nrow(heatpump_data)) {
+  stop("No weather/price observations could be matched after timezone alignment.",
+       call. = FALSE)
+}
 
 frontiers <- heatpump_data %>%
   group_by(PriceArea) %>%
