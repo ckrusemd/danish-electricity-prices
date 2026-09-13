@@ -54,7 +54,7 @@ frontiers <- heatpump_data %>%
 heatmap_data <- heatpump_data %>%
   mutate(
     TemperatureBand = floor(TemperatureC),
-    HourBand = as.integer(format(HourDK, "%H", tz = weather_config$timezone))
+    HourBand = as.integer(substr(HourKey, 12, 13))
   ) %>%
   filter(HourBand >= 7, HourBand <= 23) %>%
   group_by(PriceArea, TemperatureBand, HourBand) %>%
