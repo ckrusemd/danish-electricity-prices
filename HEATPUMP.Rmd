@@ -54,7 +54,10 @@ match_weather_prices <- function(weather, prices) {
 }
 
 heatpump_data <- match_weather_prices(weather, prices)
-if (!nrow(heatpump_data)) {
+has_target_hours <- function(data) {
+  nrow(data) > 0 && any(lubridate::hour(data$HourDK) %in% 7:23)
+}
+if (!has_target_hours(heatpump_data)) {
   weather <- fetch_historical_weather_open_meteo(period_start, period_end) %>%
     mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600) %>%
     select(-HourDK)
