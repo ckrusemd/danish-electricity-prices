@@ -12,6 +12,8 @@ on:
       - "header.html"
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
+  pull_request:
+    branches: [master]
   schedule:
     # GitHub cron is UTC. The three triggers cover 05:00 and 06:00
     # Copenhagen time across CET/CEST; the gate selects the right job.
@@ -37,9 +39,12 @@ jobs:
         id: gate
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "notify=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" != "schedule" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "notify=false" >> "$GITHUB_OUTPUT"
+            echo "notify=true" >> "$GITHUB_OUTPUT"
           else
             deploy=false
             notify=false
@@ -85,6 +90,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
