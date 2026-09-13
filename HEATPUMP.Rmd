@@ -74,14 +74,18 @@ ggplot(heatpump_data,
 ```
 
 ```{r summary}
-frontiers %>%
+frontier_summary <- frontiers %>%
   group_by(PriceArea) %>%
   summarise(
-    `Matched hours` = n(),
+    `Frontier hours` = n(),
     `Cheapest frontier price` = scales::number(min(ConsumerPriceDKK), accuracy = 0.01),
     `Warmest frontier temperature` = scales::number(max(TemperatureC), accuracy = 0.1),
     .groups = "drop"
-  ) %>%
+  )
+
+heatpump_data %>%
+  count(PriceArea, name = "Matched hours") %>%
+  left_join(frontier_summary, by = "PriceArea") %>%
   knitr::kable()
 ```
 
