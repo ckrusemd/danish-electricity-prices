@@ -1,4 +1,4 @@
-rmd_files: ["index.Rmd","EAST.Rmd","WEST.Rmd"]
+rmd_files: ["index.Rmd","HEATPUMP.Rmd","PRICE_COMPONENTS.Rmd","EAST.Rmd","WEST.Rmd"]
 book_filename: "danish-electricity-prices"
 split_by: section
 output:

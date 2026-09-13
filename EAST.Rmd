@@ -22,6 +22,7 @@ pacman::p_load(tidyr,
                lubridate)
 source("R/data.R")
 source("R/plot-theme.R")
+source("R/tariffs.R")
 knitr::opts_chunk$set(fig.width = 10, fig.height = 5.5, dpi = 144)
 ```
 
@@ -36,21 +37,7 @@ knitr::opts_chunk$set(fig.width = 10, fig.height = 5.5, dpi = 144)
 df <- fetch_elspot_prices("DK2", limit = 10000) %>%
   dplyr::mutate(ExchangeRate=SpotPriceDKK/SpotPriceEUR) %>% 
   dplyr::mutate(SpotPriceDKK=ifelse(is.na(SpotPriceDKK),SpotPriceEUR*7.43988,SpotPriceDKK)) %>% 
-  # Radius nettarif per 30. september 2023, moms 20%, afgift 87.13 ører.
-  dplyr::mutate(transport=case_when(month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(0,5,by=1)~12.20,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(6,16,by=1)~18.31,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(17,20,by=1)~47.60,
-                                    month(HourDK) %in% seq(4,9,by=1) & hour(HourDK) %in% seq(21,23,by=1)~18.31,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(0,5,by=1)~12.20,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(6,16,by=1)~36.61,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(17,20,by=1)~109.85,
-                                    month(HourDK) %in% c(1,2,3,10,11,12) & hour(HourDK) %in% seq(21,23,by=1)~36.61,
-                TRUE~as.numeric(NA))) %>% 
-  dplyr::mutate(transport=transport*0.8) %>%  # uden moms
-  dplyr::mutate(elafgift=72.00) %>% 
-  dplyr::mutate(SpotPriceDKK_Total=1.25*(SpotPriceDKK+transport/100+elafgift/100)) %>% 
-  dplyr::mutate(SpotPriceDKK_Total_SansAfgift=1.25*(SpotPriceDKK+transport/100)) %>% 
-  dplyr::mutate(SpotPriceDKK_Total_SansAfgiftTransport=1.25*(SpotPriceDKK/100))
+  apply_consumer_price_components(.)
 ```
 
 

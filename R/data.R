@@ -1,6 +1,8 @@
 # Shared data access and validation for the Danish electricity price reports.
 
-fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
+fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000,
+                                start = "now-P2D", end = "now+P2D",
+                                require_future = TRUE) {
   price_area <- match.arg(price_area)
   endpoint <- "https://api.energidataservice.dk/dataset/DayAheadPrices"
 
@@ -10,8 +12,8 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
     query = list(
       offset = 0,
       filter = jsonlite::toJSON(list(PriceArea = list(price_area)), auto_unbox = TRUE),
-      start = "now-P2D",
-      end = "now+P2D",
+      start = start,
+      end = end,
       sort = "TimeUTC DESC",
       timezone = "dk",
       limit = limit
@@ -49,6 +51,28 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
     dplyr::arrange(.data$HourDK)
 
   if (any(is.na(result$HourDK))) stop("DayAheadPrices contains invalid timestamps")
-  if (!any(result$HourDK >= Sys.time())) stop("DayAheadPrices contains no future prices")
+  if (require_future && !any(result$HourDK >= Sys.time())) stop("DayAheadPrices contains no future prices")
   result
+}
+
+cheapest_three_hour_window <- function(prices, from = -Inf, until = Inf) {
+  prices <- prices |>
+    dplyr::filter(.data$HourDK >= from, .data$HourDK < until) |>
+    dplyr::arrange(.data$HourDK)
+  if (nrow(prices) < 3) stop("Fewer than three price hours available for window calculation")
+
+  candidates <- lapply(seq_len(nrow(prices) - 2), function(i) {
+    window <- prices[i:(i + 2), , drop = FALSE]
+    if (any(diff(as.numeric(window$HourDK)) != 3600)) return(NULL)
+    data.frame(
+      start = window$HourDK[1],
+      end = window$HourDK[3] + 3600,
+      average = mean(window$SpotPriceDKK, na.rm = TRUE),
+      total = sum(window$SpotPriceDKK, na.rm = TRUE)
+    )
+  }) |>
+    Filter(Negate(is.null), x = _)
+  if (!length(candidates)) stop("No contiguous three-hour windows available")
+  windows <- do.call(rbind, candidates)
+  windows[which.min(windows$average), , drop = FALSE]
 }

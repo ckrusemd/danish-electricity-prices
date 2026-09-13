@@ -10,6 +10,7 @@ Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions a
 - Calculates total consumer price including transport tariffs and electricity tax (*elafgift*)
 - Finds the cheapest upcoming hours and rolling time windows (2–3 hours)
 - Builds a decision-tree model (rpart) to predict price levels by day-of-week and hour
+- Models the 2026 consumer price for Copenhagen/Radius/Andel FlexEnergi, with all variable and fixed components documented in [PRICE_COMPONENTS.md](PRICE_COMPONENTS.md)
 
 ## Project Structure
 

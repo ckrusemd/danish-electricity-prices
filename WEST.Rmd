@@ -19,6 +19,7 @@ pacman::p_load(tidyr,
                lubridate)
 source("R/data.R")
 source("R/plot-theme.R")
+source("R/tariffs.R")
 knitr::opts_chunk$set(fig.width = 10, fig.height = 5.5, dpi = 144)
 ```
 
