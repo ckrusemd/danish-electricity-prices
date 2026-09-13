@@ -28,7 +28,9 @@ source("R/plot-theme.R")
 period_start <- Sys.Date() - 30
 period_end <- Sys.Date() - 1
 
-weather <- fetch_historical_weather(period_start, period_end)
+weather <- fetch_historical_weather(period_start, period_end) %>%
+  mutate(HourKey = format(HourDK, "%Y-%m-%d %H", tz = weather_config$timezone)) %>%
+  select(-HourDK)
 
 prices <- bind_rows(
   fetch_elspot_prices("DK1", start = format(period_start), end = format(Sys.Date()),
@@ -37,10 +39,11 @@ prices <- bind_rows(
                       require_future = FALSE)
 ) %>%
   apply_consumer_price_components(.) %>%
-  rename(ConsumerPriceDKK = SpotPriceDKK_Total)
+  rename(ConsumerPriceDKK = SpotPriceDKK_Total) %>%
+  mutate(HourKey = format(HourDK, "%Y-%m-%d %H", tz = weather_config$timezone))
 
 heatpump_data <- prices %>%
-  inner_join(weather, by = "HourDK") %>%
+  inner_join(weather, by = "HourKey") %>%
   arrange(PriceArea, HourDK)
 
 frontiers <- heatpump_data %>%
