@@ -29,7 +29,7 @@ period_start <- Sys.Date() - 30
 period_end <- Sys.Date() - 1
 
 weather <- fetch_historical_weather(period_start, period_end) %>%
-  mutate(HourKey = format(HourDK, "%Y-%m-%d %H", tz = weather_config$timezone)) %>%
+  mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600) %>%
   select(-HourDK)
 
 prices <- bind_rows(
@@ -40,7 +40,7 @@ prices <- bind_rows(
 ) %>%
   apply_consumer_price_components(.) %>%
   rename(ConsumerPriceDKK = SpotPriceDKK_Total) %>%
-  mutate(HourKey = format(HourDK, "%Y-%m-%d %H", tz = weather_config$timezone))
+  mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600)
 
 heatpump_data <- prices %>%
   inner_join(weather, by = "HourKey") %>%
