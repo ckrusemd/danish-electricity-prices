@@ -51,7 +51,7 @@ frontiers <- heatpump_data %>%
 heatmap_data <- heatpump_data %>%
   mutate(
     TemperatureBand = floor(TemperatureC),
-    HourBand = hour(HourDK)
+    HourBand = as.integer(format(HourDK, "%H", tz = weather_config$timezone))
   ) %>%
   filter(HourBand >= 7, HourBand <= 23) %>%
   group_by(PriceArea, TemperatureBand, HourBand) %>%
@@ -60,6 +60,11 @@ heatmap_data <- heatpump_data %>%
     Observations = n(),
     .groups = "drop"
   )
+
+if (!nrow(heatmap_data)) {
+  stop("No matched weather/price observations were available between 07:00 and 23:00.",
+       call. = FALSE)
+}
 ```
 
 ## Heatmap: temperature, hour and electricity price
