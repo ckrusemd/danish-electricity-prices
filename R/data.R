@@ -18,7 +18,7 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000) {
     ),
     times = 3,
     pause_base = 1,
-    timeout(30)
+    httr::timeout(30)
   )
   httr::stop_for_status(response)
 

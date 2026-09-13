@@ -25,24 +25,24 @@ format_zone <- function(price_area, label) {
   )
 
   paste0(
-    label, ": avg ", scales::number(mean(prices$SpotPriceDKK), accuracy = 0.01),
-    " DKK/kWh; cheapest ", paste(hours, collapse = ", ")
+    label, ": gennemsnit ", scales::number(mean(prices$SpotPriceDKK), accuracy = 0.01),
+    " DKK/kWh; billigst ", paste(hours, collapse = ", ")
   )
 }
 
 notification_body <- paste(
-  "Today's projected spot prices (DKK/kWh)",
+  "Dagens forventede spotpriser (DKK/kWh)",
   format(today, "%d %b %Y"),
   "\n",
-  format_zone("DK1", "West"),
+  format_zone("DK1", "Vest"),
   "\n",
-  format_zone("DK2", "East")
+  format_zone("DK2", "Øst")
 )
 
 response <- httr::POST(
   "https://api.pushover.net/1/messages.json",
   body = list(token = app_token, user = user_key, message = notification_body,
-              title = "Danish electricity prices"),
+              title = "Danske elpriser"),
   encode = "form",
   httr::timeout(30)
 )
