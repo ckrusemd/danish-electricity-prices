@@ -2,6 +2,12 @@ name: Build and deploy electricity prices
 
 on:
   workflow_dispatch:
+    inputs:
+      send_notification:
+        description: "Send the Pushover notification"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [master]
     paths:
@@ -39,7 +45,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "notify=false" >> "$GITHUB_OUTPUT"
+            echo "notify=${{ inputs.send_notification || false }}" >> "$GITHUB_OUTPUT"
           else
             deploy=false
             notify=false
