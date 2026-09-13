@@ -8,9 +8,10 @@ output: html_document
 # Heat-pump operating frontier
 
 This analysis combines the last 30 days of hourly weather observations for Kgs.
-Lyngby with hourly electricity prices. It highlights hours that offer a useful
-trade-off between a warmer outdoor temperature (a transparent COP proxy) and a
-lower full consumer electricity price.
+Lyngby with hourly electricity prices. It shows the average full consumer price
+for each observed one-degree outdoor-temperature band and clock hour from 07:00
+to 23:00. Dark blue cells are the lowest-price combinations; white cells are
+the highest-price combinations.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
@@ -46,47 +47,60 @@ frontiers <- heatpump_data %>%
   group_by(PriceArea) %>%
   group_modify(~ pareto_frontier(.x)) %>%
   ungroup()
+
+heatmap_data <- heatpump_data %>%
+  mutate(
+    TemperatureBand = floor(TemperatureC),
+    HourBand = hour(HourDK)
+  ) %>%
+  filter(HourBand >= 7, HourBand <= 23) %>%
+  group_by(PriceArea, TemperatureBand, HourBand) %>%
+  summarise(
+    ConsumerPriceDKK = mean(ConsumerPriceDKK, na.rm = TRUE),
+    Observations = n(),
+    .groups = "drop"
+  )
 ```
 
-## Temperature versus full electricity price
+## Heatmap: temperature, hour and electricity price
 
-Each point is one matched hour. The frontier contains hours for which no other
-observed hour is both warmer and cheaper. This is a decision-support view, not
-a manufacturer COP curve: actual COP also depends on flow temperature, system
-design, defrosting and the specific heat pump.
+Each tile represents the mean full consumer price for a one-degree temperature
+band and one clock hour. This is a decision-support view, not a manufacturer
+COP curve: actual COP also depends on flow temperature, system design,
+defrosting and the specific heat pump.
 
-```{r frontier, fig.width=10, fig.height=6}
-ggplot(heatpump_data,
-       aes(x = TemperatureC, y = ConsumerPriceDKK, colour = PriceArea)) +
-  geom_point(alpha = 0.28, size = 1.7) +
-  geom_line(data = frontiers,
-            aes(group = PriceArea), linewidth = 1.1, inherit.aes = TRUE) +
-  geom_point(data = frontiers, size = 2.2, inherit.aes = TRUE) +
+```{r heatmap, fig.width=10, fig.height=7}
+ggplot(heatmap_data,
+       aes(x = TemperatureBand, y = HourBand, fill = ConsumerPriceDKK)) +
+  geom_tile(colour = "#173238", linewidth = 0.25) +
+  facet_wrap(~ PriceArea, ncol = 1) +
+  scale_fill_gradient(
+    low = "#062b5c", high = "#ffffff", na.value = "#173238",
+    name = "DKK/kWh"
+  ) +
+  scale_y_continuous(breaks = 7:23, limits = c(6.5, 23.5), expand = c(0, 0)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 12), expand = c(0, 0)) +
   labs(
-    title = "Heat-pump operating frontier, last 30 days",
+    title = "Heat-pump electricity-price heatmap, last 30 days",
     subtitle = paste(period_start, "to", period_end,
-                     "· full Andel FlexEnergi consumer price"),
-    x = "Outdoor temperature (°C; higher generally improves COP)",
-    y = "Electricity price (DKK/kWh, all components)",
-    colour = "Price area"
+                     "· hourly bands · full Andel FlexEnergi consumer price"),
+    x = "Outdoor temperature band (°C)",
+    y = "Hour of day",
+    caption = "Dark blue = lowest observed mean price; white = highest."
   ) +
   plot_theme()
 ```
 
 ```{r summary}
-frontier_summary <- frontiers %>%
+heatmap_data %>%
   group_by(PriceArea) %>%
   summarise(
-    `Frontier hours` = n(),
-    `Cheapest frontier price` = scales::number(min(ConsumerPriceDKK), accuracy = 0.01),
-    `Warmest frontier temperature` = scales::number(max(TemperatureC), accuracy = 0.1),
+    `Temperature bands` = n_distinct(TemperatureBand),
+    `Hour bands` = n_distinct(HourBand),
+    `Lowest mean price` = scales::number(min(ConsumerPriceDKK), accuracy = 0.01),
+    `Highest mean price` = scales::number(max(ConsumerPriceDKK), accuracy = 0.01),
     .groups = "drop"
-  )
-
-heatpump_data %>%
-  count(PriceArea, name = "Matched hours") %>%
-  left_join(frontier_summary, by = "PriceArea") %>%
-  knitr::kable()
+  ) %>% knitr::kable()
 ```
 
 The OpenWeatherMap historical endpoint must be enabled for the
