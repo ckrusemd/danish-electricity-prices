@@ -19,7 +19,6 @@ RUN apt-get update \
         libxml2-dev \
         pkg-config \
         pandoc \
-        pandoc-citeproc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /project
