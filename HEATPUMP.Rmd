@@ -42,15 +42,24 @@ prices <- bind_rows(
   rename(ConsumerPriceDKK = SpotPriceDKK_Total) %>%
   mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600)
 
-candidate_offsets <- c(0, -1, 1, -2, 2, -24, 24)
-candidate_matches <- lapply(candidate_offsets, function(offset) {
-  weather %>%
-    mutate(HourKey = HourKey + offset) %>%
-    inner_join(prices, by = "HourKey") %>%
-    arrange(PriceArea, HourDK)
-})
-match_counts <- vapply(candidate_matches, nrow, integer(1))
-heatpump_data <- candidate_matches[[which.max(match_counts)]]
+match_weather_prices <- function(weather, prices) {
+  candidate_offsets <- c(0, -1, 1, -2, 2, -24, 24)
+  candidate_matches <- lapply(candidate_offsets, function(offset) {
+    weather %>%
+      mutate(HourKey = HourKey + offset) %>%
+      inner_join(prices, by = "HourKey") %>%
+      arrange(PriceArea, HourDK)
+  })
+  candidate_matches[[which.max(vapply(candidate_matches, nrow, integer(1)))]]
+}
+
+heatpump_data <- match_weather_prices(weather, prices)
+if (!nrow(heatpump_data)) {
+  weather <- fetch_historical_weather_open_meteo(period_start, period_end) %>%
+    mutate(HourKey = as.numeric(as.POSIXct(HourDK, tz = "UTC")) %/% 3600) %>%
+    select(-HourDK)
+  heatpump_data <- match_weather_prices(weather, prices)
+}
 if (!nrow(heatpump_data)) {
   stop("No weather/price observations could be matched after timezone alignment.",
        call. = FALSE)

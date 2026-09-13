@@ -57,6 +57,34 @@ fetch_historical_weather <- function(start = Sys.Date() - 30,
   result[order(result$HourDK), , drop = FALSE]
 }
 
+fetch_historical_weather_open_meteo <- function(start = Sys.Date() - 30,
+                                                end = Sys.Date() - 1,
+                                                config = weather_config) {
+  response <- httr::GET(
+    "https://archive-api.open-meteo.com/v1/archive",
+    query = list(
+      latitude = config$lat, longitude = config$lon,
+      start_date = as.character(as.Date(start)),
+      end_date = as.character(as.Date(end)),
+      hourly = "temperature_2m,relative_humidity_2m",
+      timezone = config$timezone
+    ),
+    httr::timeout(30)
+  )
+  httr::stop_for_status(response)
+  payload <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"))
+  if (!is.list(payload$hourly) || !length(payload$hourly$time)) {
+    stop("Open-Meteo historical response contains no hourly data.", call. = FALSE)
+  }
+  data.frame(
+    HourDK = as.POSIXct(payload$hourly$time, format = "%Y-%m-%dT%H:%M",
+                        tz = config$timezone),
+    TemperatureC = as.numeric(payload$hourly$temperature_2m),
+    Humidity = as.numeric(payload$hourly$relative_humidity_2m),
+    stringsAsFactors = FALSE
+  )
+}
+
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 pareto_frontier <- function(data, temperature_col = "TemperatureC",
