@@ -1,4 +1,4 @@
-FROM rocker/r-ver:4.3.3
+FROM rocker/r-ver:4.6.1
 
 LABEL org.opencontainers.image.source="https://github.com/ckrusemd/danish-electricity-prices"
 LABEL org.opencontainers.image.description="Locked R environment for the Danish electricity prices publication"
@@ -10,11 +10,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         libcurl4-openssl-dev \
+        libfontconfig1-dev \
+        libfreetype6-dev \
         libglpk-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
         libssl-dev \
+        libxml2-dev \
         pkg-config \
         pandoc \
-        pandoc-citeproc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /project
