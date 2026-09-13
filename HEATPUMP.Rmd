@@ -73,9 +73,9 @@ frontiers <- heatpump_data %>%
 heatmap_data <- heatpump_data %>%
   mutate(
     TemperatureBand = floor(TemperatureC),
-    HourBand = as.integer(format(
+    HourBand = lubridate::hour(lubridate::with_tz(
       as.POSIXct(HourKey * 3600, origin = "1970-01-01", tz = "UTC"),
-      "%H", tz = weather_config$timezone
+      tzone = weather_config$timezone
     ))
   ) %>%
   filter(HourBand >= 7, HourBand <= 23) %>%
