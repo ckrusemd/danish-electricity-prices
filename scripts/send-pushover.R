@@ -112,7 +112,7 @@ response <- httr::POST(
   "https://api.pushover.net/1/messages.json",
   body = list(token = app_token, user = user_key, message = notification_body,
               title = "Danish electricity prices", attachment = httr::upload_file(price_graph)),
-  encode = "form",
+  encode = "multipart",
   httr::timeout(30)
 )
 httr::stop_for_status(response)
