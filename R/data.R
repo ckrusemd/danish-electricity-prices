@@ -55,6 +55,28 @@ fetch_elspot_prices <- function(price_area = c("DK1", "DK2"), limit = 10000,
   result
 }
 
+fetch_quarter_hour_prices <- function(price_area = c("DK1", "DK2"), limit = 10000,
+                                      start = "now-P2D", end = "now+P2D",
+                                      require_future = TRUE) {
+  price_area <- match.arg(price_area)
+  response <- httr::RETRY("GET", "https://api.energidataservice.dk/dataset/DayAheadPrices",
+    query = list(offset = 0, filter = jsonlite::toJSON(list(PriceArea = list(price_area)), auto_unbox = TRUE),
+      start = start, end = end, sort = "TimeUTC DESC", timezone = "dk", limit = limit),
+    times = 3, pause_base = 1, httr::timeout(30))
+  httr::stop_for_status(response)
+  records <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"))$records
+  if (!is.data.frame(records) || !all(c("TimeDK", "PriceArea", "DayAheadPriceDKK") %in% names(records)))
+    stop("DayAheadPrices response is missing quarter-hour columns")
+  result <- records |>
+    dplyr::filter(.data$PriceArea == price_area) |>
+    dplyr::transmute(TimeDK = lubridate::ymd_hms(.data$TimeDK, tz = "Europe/Copenhagen"),
+                     PriceArea = .data$PriceArea, SpotPriceDKK = .data$DayAheadPriceDKK / 1000) |>
+    dplyr::arrange(.data$TimeDK)
+  if (!nrow(result)) stop("No quarter-hour records for ", price_area)
+  if (require_future && !any(result$TimeDK >= Sys.time())) stop("No future quarter-hour prices available")
+  result
+}
+
 cheapest_three_hour_window <- function(prices, from = -Inf, until = Inf) {
   prices <- prices |>
     dplyr::filter(.data$HourDK >= from, .data$HourDK < until) |>

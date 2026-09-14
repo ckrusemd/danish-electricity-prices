@@ -59,6 +59,22 @@ format_zone <- function(price_area, label) {
   )
 }
 
+create_price_graph <- function() {
+  prices <- dplyr::bind_rows(
+    fetch_quarter_hour_prices("DK1") |> dplyr::mutate(Zone = "DK1 (West)"),
+    fetch_quarter_hour_prices("DK2") |> dplyr::mutate(Zone = "DK2 (East)")
+  ) |> dplyr::filter(as.Date(.data$TimeDK, tz = "Europe/Copenhagen") == today)
+  path <- tempfile(fileext = ".png")
+  plot <- ggplot2::ggplot(prices, ggplot2::aes(.data$TimeDK, .data$SpotPriceDKK, colour = .data$Zone)) +
+    ggplot2::geom_line(linewidth = 0.8) +
+    ggplot2::scale_x_datetime(date_breaks = "2 hours", date_labels = "%H:%M", timezone = "Europe/Copenhagen") +
+    ggplot2::scale_colour_manual(values = c("DK1 (West)" = "#1d4ed8", "DK2 (East)" = "#f97316")) +
+    ggplot2::labs(title = paste("Danish electricity price -", format(today, "%d %b %Y")), x = "Time", y = "DKK/kWh", colour = NULL) +
+    ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(legend.position = "bottom")
+  ggplot2::ggsave(path, plot, width = 10, height = 5.5, dpi = 150)
+  path
+}
+
 notification_body <- paste(
   "Today's projected spot prices (DKK/kWh)",
   format(today, "%d %b %Y"),
@@ -70,10 +86,12 @@ notification_body <- paste(
   "\n", format_comparison("DK2", "East")
 )
 
+price_graph <- create_price_graph()
+
 response <- httr::POST(
   "https://api.pushover.net/1/messages.json",
   body = list(token = app_token, user = user_key, message = notification_body,
-              title = "Danish electricity prices"),
+              title = "Danish electricity prices", attachment = httr::upload_file(price_graph)),
   encode = "form",
   httr::timeout(30)
 )
