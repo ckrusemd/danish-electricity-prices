@@ -53,9 +53,29 @@ format_zone <- function(price_area, label) {
     sep = " @ "
   )
 
+  period_average <- function(start_hour, end_hour) {
+    period <- prices |>
+      dplyr::filter(
+        as.integer(format(.data$HourDK, "%H", tz = "Europe/Copenhagen")) >= start_hour,
+        as.integer(format(.data$HourDK, "%H", tz = "Europe/Copenhagen")) < end_hour
+      )
+    if (!nrow(period)) return("n/a")
+    scales::number(mean(period$SpotPriceDKK), accuracy = 0.01)
+  }
+
+  periods <- paste0(
+    "00-06 ", period_average(0, 6),
+    ", 06-09 ", period_average(6, 9),
+    ", 09-17 ", period_average(9, 17),
+    ", 17-21 ", period_average(17, 21),
+    ", 21-24 ", period_average(21, 24),
+    " DKK/kWh"
+  )
+
   paste0(
     label, ": avg ", scales::number(mean(prices$SpotPriceDKK), accuracy = 0.01),
-    " DKK/kWh; cheapest ", paste(hours, collapse = ", ")
+    " DKK/kWh; cheapest ", paste(hours, collapse = ", "),
+    "\n  Period averages: ", periods
   )
 }
 
