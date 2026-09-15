@@ -19,8 +19,8 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    # GitHub cron is UTC. The three triggers cover 05:00 and 06:00
-    # Copenhagen time across CET/CEST; the gate selects the right job.
+    # GitHub cron is UTC. These triggers cover 05:00 Copenhagen time
+    # across CET/CEST; the gate selects the right run.
     - cron: "0 3 * * *"
     - cron: "0 4 * * *"
     - cron: "0 5 * * *"
@@ -50,10 +50,8 @@ jobs:
             deploy=false
             notify=false
             local_hour=$(TZ=Europe/Copenhagen date +%H)
-            if [ "$local_hour" = "06" ]; then
-              deploy=true
-            fi
             if [ "$local_hour" = "05" ]; then
+              deploy=true
               notify=true
             fi
             echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
