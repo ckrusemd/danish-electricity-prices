@@ -108,11 +108,16 @@ notification_body <- paste(
 
 price_graph <- create_price_graph()
 
-response <- httr::POST(
+response <- httr::RETRY(
+  "POST",
   "https://api.pushover.net/1/messages.json",
   body = list(token = app_token, user = user_key, message = notification_body,
               title = "Danish electricity prices", attachment = httr::upload_file(price_graph)),
   encode = "multipart",
+  times = 5,
+  pause_base = 5,
+  pause_cap = 60,
+  terminate_on = c(200, 400, 401, 403),
   httr::timeout(30)
 )
 httr::stop_for_status(response)
