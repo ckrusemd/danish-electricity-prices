@@ -83,13 +83,37 @@ create_price_graph <- function() {
   prices <- dplyr::bind_rows(
     fetch_quarter_hour_prices("DK1") |> dplyr::mutate(Zone = "DK1 (West)"),
     fetch_quarter_hour_prices("DK2") |> dplyr::mutate(Zone = "DK2 (East)")
-  ) |> dplyr::filter(as.Date(.data$TimeDK, tz = "Europe/Copenhagen") == today)
+  ) |>
+    dplyr::filter(as.Date(.data$TimeDK, tz = "Europe/Copenhagen") == today) |>
+    dplyr::mutate(hour = lubridate::hour(.data$TimeDK), minute = lubridate::minute(.data$TimeDK))
+
+  historical <- dplyr::bind_rows(
+    fetch_quarter_hour_prices("DK1", limit = 20000, start = "now-P6M", end = "now-P1D", require_future = FALSE) |>
+      dplyr::mutate(Zone = "DK1 (West)"),
+    fetch_quarter_hour_prices("DK2", limit = 20000, start = "now-P6M", end = "now-P1D", require_future = FALSE) |>
+      dplyr::mutate(Zone = "DK2 (East)")
+  ) |>
+    dplyr::mutate(hour = lubridate::hour(.data$TimeDK), minute = lubridate::minute(.data$TimeDK)) |>
+    dplyr::group_by(.data$Zone, .data$hour, .data$minute) |>
+    dplyr::summarise(
+      q25 = stats::quantile(.data$SpotPriceDKK, 0.25, na.rm = TRUE),
+      median = stats::median(.data$SpotPriceDKK, na.rm = TRUE),
+      q75 = stats::quantile(.data$SpotPriceDKK, 0.75, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  plot_data <- dplyr::left_join(prices, historical, by = c("Zone", "hour", "minute"))
   path <- tempfile(fileext = ".png")
-  plot <- ggplot2::ggplot(prices, ggplot2::aes(.data$TimeDK, .data$SpotPriceDKK, colour = .data$Zone)) +
+  plot <- ggplot2::ggplot(plot_data, ggplot2::aes(.data$TimeDK, .data$SpotPriceDKK, colour = .data$Zone)) +
+    ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$q25, ymax = .data$q75, fill = .data$Zone), alpha = 0.16, colour = NA) +
+    ggplot2::geom_line(ggplot2::aes(y = .data$median), linetype = "dashed", linewidth = 0.6) +
     ggplot2::geom_line(linewidth = 0.8) +
     ggplot2::scale_x_datetime(date_breaks = "2 hours", date_labels = "%H:%M", timezone = "Europe/Copenhagen") +
     ggplot2::scale_colour_manual(values = c("DK1 (West)" = "#1d4ed8", "DK2 (East)" = "#f97316")) +
-    ggplot2::labs(title = paste("Danish electricity price -", format(today, "%d %b %Y")), x = "Time", y = "DKK/kWh", colour = NULL) +
+    ggplot2::scale_fill_manual(values = c("DK1 (West)" = "#1d4ed8", "DK2 (East)" = "#f97316"), guide = "none") +
+    ggplot2::labs(title = paste("Danish electricity price -", format(today, "%d %b %Y")),
+                  subtitle = "Solid: today · dashed: 6-month median · band: Q25-Q75 by 15-minute slot",
+                  x = "Time", y = "DKK/kWh", colour = NULL) +
     ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(legend.position = "bottom")
   ggplot2::ggsave(path, plot, width = 10, height = 5.5, dpi = 150)
   path
