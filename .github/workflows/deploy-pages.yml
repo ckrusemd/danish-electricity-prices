@@ -19,9 +19,9 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    # GitHub cron is UTC: 04:00 in CET and 03:00 in CEST are 05:00 locally.
-    - cron: "0 3 * * *"
-    - cron: "0 4 * * *"
+    # Run at 05:07 Copenhagen time, avoiding GitHub's busiest top-of-hour window.
+    - cron: "7 3 * * *"
+    - cron: "7 4 * * *"
 
 permissions:
   contents: read
@@ -49,8 +49,8 @@ jobs:
             notify=false
             local_zone=$(TZ=Europe/Copenhagen date +%Z)
             scheduled_cron='${{ github.event.schedule }}'
-            if { [ "$scheduled_cron" = "0 3 * * *" ] && [ "$local_zone" = "CEST" ]; } || \
-               { [ "$scheduled_cron" = "0 4 * * *" ] && [ "$local_zone" = "CET" ]; }; then
+            if { [ "$scheduled_cron" = "7 3 * * *" ] && [ "$local_zone" = "CEST" ]; } || \
+               { [ "$scheduled_cron" = "7 4 * * *" ] && [ "$local_zone" = "CET" ]; }; then
               deploy=true
               notify=true
             fi
