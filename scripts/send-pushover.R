@@ -88,9 +88,9 @@ create_price_graph <- function() {
     dplyr::mutate(hour = lubridate::hour(.data$TimeDK), minute = lubridate::minute(.data$TimeDK))
 
   historical <- dplyr::bind_rows(
-    fetch_quarter_hour_prices("DK1", limit = 20000, start = "now-P6M", end = "now-P1D", require_future = FALSE) |>
+    fetch_quarter_hour_prices("DK1", limit = 5000, start = "now-P30D", end = "now-P1D", require_future = FALSE) |>
       dplyr::mutate(Zone = "DK1 (West)"),
-    fetch_quarter_hour_prices("DK2", limit = 20000, start = "now-P6M", end = "now-P1D", require_future = FALSE) |>
+    fetch_quarter_hour_prices("DK2", limit = 5000, start = "now-P30D", end = "now-P1D", require_future = FALSE) |>
       dplyr::mutate(Zone = "DK2 (East)")
   ) |>
     dplyr::mutate(hour = lubridate::hour(.data$TimeDK), minute = lubridate::minute(.data$TimeDK)) |>
@@ -112,7 +112,7 @@ create_price_graph <- function() {
     ggplot2::scale_colour_manual(values = c("DK1 (West)" = "#1d4ed8", "DK2 (East)" = "#f97316")) +
     ggplot2::scale_fill_manual(values = c("DK1 (West)" = "#1d4ed8", "DK2 (East)" = "#f97316"), guide = "none") +
     ggplot2::labs(title = paste("Danish electricity price -", format(today, "%d %b %Y")),
-                  subtitle = "Solid: today · dashed: 6-month median · band: Q25-Q75 by 15-minute slot",
+                  subtitle = "Solid: today · dashed: 30-day median · band: Q25-Q75 by 15-minute slot",
                   x = "Time", y = "DKK/kWh", colour = NULL) +
     ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(legend.position = "bottom")
   ggplot2::ggsave(path, plot, width = 10, height = 5.5, dpi = 150)
