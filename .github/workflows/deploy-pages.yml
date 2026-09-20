@@ -19,12 +19,12 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    # Run at 05:07 Copenhagen time, avoiding GitHub's busiest top-of-hour window.
-    - cron: "7 3 * * *"
-    - cron: "7 4 * * *"
+    # Retry every 15 minutes around 05:00 Copenhagen time. A state branch
+    # records successful delivery, so only one notification is sent per day.
+    - cron: "7,22,37,52 3,4 * * *"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pages
@@ -37,6 +37,10 @@ jobs:
       deploy: ${{ steps.gate.outputs.deploy }}
       notify: ${{ steps.gate.outputs.notify }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
       - name: Check Copenhagen schedule
         id: gate
         shell: bash
@@ -47,10 +51,11 @@ jobs:
           else
             deploy=false
             notify=false
-            local_zone=$(TZ=Europe/Copenhagen date +%Z)
-            scheduled_cron='${{ github.event.schedule }}'
-            if { [ "$scheduled_cron" = "7 3 * * *" ] && [ "$local_zone" = "CEST" ]; } || \
-               { [ "$scheduled_cron" = "7 4 * * *" ] && [ "$local_zone" = "CET" ]; }; then
+            local_date=$(TZ=Europe/Copenhagen date +%F)
+            local_hour=$(TZ=Europe/Copenhagen date +%H)
+            git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
+            last_sent=$(git show origin/electricity-notification-state:last_notification_date 2>/dev/null || true)
+            if [ "$local_hour" -ge 5 ] && [ "$local_hour" -lt 12 ] && [ "$last_sent" != "$local_date" ]; then
               deploy=true
               notify=true
             fi
@@ -121,3 +126,32 @@ jobs:
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
         run: Rscript --vanilla scripts/send-pushover.R
+
+  record-notification:
+    needs: [schedule-gate, notify]
+    if: github.event_name == 'schedule' && needs.schedule-gate.outputs.notify == 'true' && needs.notify.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Record successful notification
+        shell: bash
+        run: |
+          local_date=$(TZ=Europe/Copenhagen date +%F)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/electricity-notification-state; then
+            git checkout -B electricity-notification-state origin/electricity-notification-state
+          else
+            git checkout --orphan electricity-notification-state
+            git rm -rf .
+          fi
+          printf '%s\n' "$local_date" > last_notification_date
+          git add last_notification_date
+          git commit -m "Record electricity notification for $local_date"
+          git push origin electricity-notification-state
