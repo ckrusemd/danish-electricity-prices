@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      scheduled_delivery:
+        description: "Use the daily delivery lock for an external scheduler"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [master]
     paths:
@@ -45,7 +50,7 @@ jobs:
         id: gate
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scheduled_delivery }}" != "true" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             echo "notify=${{ inputs.send_notification || false }}" >> "$GITHUB_OUTPUT"
           else
@@ -129,7 +134,7 @@ jobs:
 
   record-notification:
     needs: [schedule-gate, notify]
-    if: github.event_name == 'schedule' && needs.schedule-gate.outputs.notify == 'true' && needs.notify.result == 'success'
+    if: (github.event_name == 'schedule' || inputs.scheduled_delivery == true) && needs.schedule-gate.outputs.notify == 'true' && needs.notify.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
