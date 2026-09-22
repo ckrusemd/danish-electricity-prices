@@ -3,9 +3,9 @@
   "deliveries": {
     "morning": {
       "date": "2026-09-22",
-      "sent_at": "2026-09-22T19:14:53+02:00",
-      "run_id": "35759307438",
-      "pushover_request_id": "e06494e5-7916-45fa-a0ec-98eb40a0c351"
+      "sent_at": "2026-09-22T20:34:50+02:00",
+      "run_id": "35767960915",
+      "pushover_request_id": "272029e4-2de7-4fa3-954d-863fa20593bf"
     }
   }
 }
