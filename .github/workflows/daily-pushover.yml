@@ -107,7 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           Rscript --vanilla scripts/send-pushover.R
-          request_id="$(jq -r '.request // empty' pushover-result.json)"
+          request_id="$(Rscript --vanilla -e 'result <- jsonlite::read_json("pushover-result.json", simplifyVector = TRUE); cat(if (is.null(result$request)) "" else result$request)')"
           test -n "$request_id"
           echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
 
