@@ -2,13 +2,16 @@
 
 `deploy-pages.yml` renders `index.Rmd` in a prebuilt public GHCR container,
 uploads `_site` as a Pages artifact, and deploys it to the `github-pages`
-environment. It runs daily at 06:00 Europe/Copenhagen time, on relevant
+environment. It runs daily after 05:00 Europe/Copenhagen time, on relevant
 changes to `master`, and manually. Because GitHub cron uses UTC, it triggers
 at 04:00 and 05:00 UTC and selects the trigger matching the current
-CET/CEST daylight-saving offset. It also sends a Pushover summary at 05:00
-Europe/Copenhagen using the `PUSHOVER_APP_TOKEN` and `PUSHOVER_USER_KEY`
-repository secrets. The gate uses the triggering cron expression rather than
-the actual start time, so GitHub schedule delays do not suppress the jobs.
+CET/CEST daylight-saving offset. Its state is independent from notifications.
+
+`daily-pushover.yml` sends the electricity summary. A persistent local systemd
+timer dispatches it at 05:05 Europe/Copenhagen and waits for confirmed Pushover
+acceptance. An hourly Actions watchdog catches up a missing delivery. The
+`electricity-notification-state` branch records the date, run ID and Pushover
+request ID to prevent duplicate delivery.
 
 `build-container.yml` rebuilds and publishes
 `ghcr.io/ckrusemd/danish-electricity-prices-r` when the Dockerfile or locked R

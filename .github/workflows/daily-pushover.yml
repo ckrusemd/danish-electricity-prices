@@ -1,0 +1,168 @@
+name: Daily Pushover electricity
+run-name: Electricity Pushover • ${{ inputs.delivery_slot || 'morning' }} • ${{ inputs.dispatch_id || github.run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      delivery_slot:
+        description: Delivery slot (electricity supports morning only)
+        required: true
+        default: morning
+        type: choice
+        options: [morning, afternoon]
+      scheduled_delivery:
+        description: Respect the daily delivery lock
+        required: true
+        default: true
+        type: boolean
+      force_send:
+        description: Send even when this slot is already recorded
+        required: false
+        default: false
+        type: boolean
+      dispatch_id:
+        description: Correlation ID used by the external scheduler
+        required: false
+        default: manual
+        type: string
+  schedule:
+    - cron: "37 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electricity-pushover-morning
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      notify: ${{ steps.gate.outputs.notify }}
+      slot: ${{ steps.gate.outputs.slot }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - id: gate
+        shell: bash
+        env:
+          REQUESTED_SLOT: ${{ inputs.delivery_slot || 'morning' }}
+          SCHEDULED_DELIVERY: ${{ inputs.scheduled_delivery || false }}
+          FORCE_SEND: ${{ inputs.force_send || false }}
+        run: |
+          set -euo pipefail
+          slot="$REQUESTED_SLOT"
+          if [ "$slot" != "morning" ]; then
+            echo "Electricity notifications support the morning slot only." >&2
+            exit 1
+          fi
+          local_date="$(TZ=Europe/Copenhagen date +%F)"
+          local_hour="$(TZ=Europe/Copenhagen date +%H)"
+          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
+          state="$(git show origin/electricity-notification-state:delivery-state.json 2>/dev/null || printf '{}')"
+          sent_date="$(printf '%s' "$state" | jq -r --arg slot "$slot" '.deliveries[$slot].date // empty' 2>/dev/null || true)"
+          if [ -z "$sent_date" ]; then
+            sent_date="$(git show origin/electricity-notification-state:last_notification_date 2>/dev/null || true)"
+          fi
+          notify=false
+          if [ "$FORCE_SEND" = "true" ]; then
+            notify=true
+          elif { [ "${{ github.event_name }}" = "schedule" ] || [ "$SCHEDULED_DELIVERY" = "true" ]; } \
+               && [ "$((10#$local_hour))" -ge 5 ] && [ "$sent_date" != "$local_date" ]; then
+            notify=true
+          fi
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "notify=$notify" >> "$GITHUB_OUTPUT"
+          echo "Electricity gate: date=$local_date hour=$local_hour sent=$sent_date notify=$notify"
+
+  notify:
+    needs: gate
+    if: needs.gate.outputs.notify == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      request_id: ${{ steps.send.outputs.request_id }}
+    container:
+      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
+      options: --user root
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate notification configuration
+        shell: bash
+        env:
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          test -n "$PUSHOVER_APP_TOKEN"
+          test -n "$PUSHOVER_USER_KEY"
+      - name: Send electricity notification
+        id: send
+        shell: bash
+        env:
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+          PUSHOVER_RESULT_FILE: pushover-result.json
+        run: |
+          set -euo pipefail
+          Rscript --vanilla scripts/send-pushover.R
+          request_id="$(jq -r '.request // empty' pushover-result.json)"
+          test -n "$request_id"
+          echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
+
+  record-delivery:
+    needs: [gate, notify]
+    if: always() && needs.gate.outputs.notify == 'true' && needs.notify.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Record confirmed Pushover delivery
+        shell: bash
+        env:
+          DELIVERY_SLOT: ${{ needs.gate.outputs.slot }}
+          PUSHOVER_REQUEST_ID: ${{ needs.notify.outputs.request_id }}
+        run: |
+          set -euo pipefail
+          local_date="$(TZ=Europe/Copenhagen date +%F)"
+          sent_at="$(TZ=Europe/Copenhagen date --iso-8601=seconds)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
+          state="$(git show origin/electricity-notification-state:delivery-state.json 2>/dev/null || printf '{}')"
+          if ! printf '%s' "$state" | jq -e . >/dev/null 2>&1; then state='{}'; fi
+          if git show-ref --verify --quiet refs/remotes/origin/electricity-notification-state; then
+            git checkout -B electricity-notification-state origin/electricity-notification-state
+          else
+            git checkout --orphan electricity-notification-state
+            git rm -rf . || true
+          fi
+          printf '%s' "$state" | jq \
+            --arg slot "$DELIVERY_SLOT" --arg date "$local_date" --arg sent_at "$sent_at" \
+            --arg run_id "$GITHUB_RUN_ID" --arg request_id "$PUSHOVER_REQUEST_ID" \
+            '.schema_version = 1 | .deliveries[$slot] = {date: $date, sent_at: $sent_at, run_id: $run_id, pushover_request_id: $request_id}' \
+            > delivery-state.json
+          git add delivery-state.json
+          git commit -m "Record $DELIVERY_SLOT electricity notification for $local_date"
+          git push origin electricity-notification-state
+
+  summary:
+    needs: [gate, notify, record-delivery]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify workflow outcome
+        env:
+          NOTIFY_REQUIRED: ${{ needs.gate.outputs.notify }}
+          NOTIFY_RESULT: ${{ needs.notify.result }}
+          RECORD_RESULT: ${{ needs.record-delivery.result }}
+          REQUEST_ID: ${{ needs.notify.outputs.request_id }}
+        run: |
+          echo "required=$NOTIFY_REQUIRED notify=$NOTIFY_RESULT record=$RECORD_RESULT request=$REQUEST_ID"
+          if [ "$NOTIFY_REQUIRED" = "true" ] && { [ "$NOTIFY_RESULT" != "success" ] || [ "$RECORD_RESULT" != "success" ]; }; then
+            exit 1
+          fi

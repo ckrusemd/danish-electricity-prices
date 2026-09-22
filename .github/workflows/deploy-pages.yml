@@ -2,17 +2,6 @@ name: Build and deploy electricity prices
 
 on:
   workflow_dispatch:
-    inputs:
-      send_notification:
-        description: "Send the Pushover notification"
-        required: false
-        default: false
-        type: boolean
-      scheduled_delivery:
-        description: "Use the daily delivery lock for an external scheduler"
-        required: false
-        default: false
-        type: boolean
   push:
     branches: [master]
     paths:
@@ -24,8 +13,8 @@ on:
       - "index.Rmd"
       - ".github/workflows/deploy-pages.yml"
   schedule:
-    # Retry every 15 minutes around 05:00 Copenhagen time. A state branch
-    # records successful delivery, so only one notification is sent per day.
+    # Two UTC candidates cover 05:17 in Copenhagen across DST. The Pages
+    # state branch ensures that delayed or duplicate starts deploy only once.
     - cron: "7,22,37,52 3,4 * * *"
 
 permissions:
@@ -40,7 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.gate.outputs.deploy }}
-      notify: ${{ steps.gate.outputs.notify }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -50,22 +38,18 @@ jobs:
         id: gate
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scheduled_delivery }}" != "true" ]; then
+          if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "notify=${{ inputs.send_notification || false }}" >> "$GITHUB_OUTPUT"
           else
             deploy=false
-            notify=false
             local_date=$(TZ=Europe/Copenhagen date +%F)
             local_hour=$(TZ=Europe/Copenhagen date +%H)
-            git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
-            last_sent=$(git show origin/electricity-notification-state:last_notification_date 2>/dev/null || true)
-            if [ "$local_hour" -ge 5 ] && [ "$local_hour" -lt 12 ] && [ "$last_sent" != "$local_date" ]; then
+            git fetch origin electricity-pages-state:refs/remotes/origin/electricity-pages-state 2>/dev/null || true
+            last_deployed=$(git show origin/electricity-pages-state:last_deployment_date 2>/dev/null || true)
+            if [ "$((10#$local_hour))" -ge 5 ] && [ "$last_deployed" != "$local_date" ]; then
               deploy=true
-              notify=true
             fi
             echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
-            echo "notify=$notify" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -115,26 +99,9 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-  notify:
-    needs: schedule-gate
-    if: needs.schedule-gate.outputs.notify == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container:
-      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
-      options: --user root
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-      - name: Send Pushover notification
-        env:
-          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
-          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
-        run: Rscript --vanilla scripts/send-pushover.R
-
-  record-notification:
-    needs: [schedule-gate, notify]
-    if: (github.event_name == 'schedule' || inputs.scheduled_delivery == true) && needs.schedule-gate.outputs.notify == 'true' && needs.notify.result == 'success'
+  record-deployment:
+    needs: deploy
+    if: github.event_name == 'schedule' && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -143,20 +110,20 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
-      - name: Record successful notification
+      - name: Record successful deployment
         shell: bash
         run: |
           local_date=$(TZ=Europe/Copenhagen date +%F)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
-          if git show-ref --verify --quiet refs/remotes/origin/electricity-notification-state; then
-            git checkout -B electricity-notification-state origin/electricity-notification-state
+          git fetch origin electricity-pages-state:refs/remotes/origin/electricity-pages-state 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/electricity-pages-state; then
+            git checkout -B electricity-pages-state origin/electricity-pages-state
           else
-            git checkout --orphan electricity-notification-state
-            git rm -rf .
+            git checkout --orphan electricity-pages-state
+            git rm -rf . || true
           fi
-          printf '%s\n' "$local_date" > last_notification_date
-          git add last_notification_date
-          git commit -m "Record electricity notification for $local_date"
-          git push origin electricity-notification-state
+          printf '%s\n' "$local_date" > last_deployment_date
+          git add last_deployment_date
+          git commit -m "Record electricity deployment for $local_date"
+          git push origin electricity-pages-state

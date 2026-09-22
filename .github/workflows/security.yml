@@ -23,6 +23,7 @@ jobs:
       - name: Validate repository files
         run: |
           test -f .github/workflows/deploy-pages.yml
+          test -f .github/workflows/daily-pushover.yml
           test -f .github/workflows/build-container.yml
           test -f Dockerfile
           test -f .dockerignore
@@ -31,4 +32,7 @@ jobs:
           test -f _bookdown.yml
           git diff --check
       - name: Validate shared R source is present
-        run: test -s R/data.R
+        run: |
+          test -s R/data.R
+          bash -n scripts/dispatch-daily-pushover.sh
+          Rscript --vanilla -e 'parse(file = "R/data.R"); parse(file = "scripts/send-pushover.R")'

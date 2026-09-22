@@ -4,8 +4,7 @@ app_token <- Sys.getenv("PUSHOVER_APP_TOKEN")
 user_key <- Sys.getenv("PUSHOVER_USER_KEY")
 
 if (!nzchar(app_token) || !nzchar(user_key)) {
-  message("Pushover secrets are not configured; skipping notification.")
-  quit(save = "no", status = 0)
+  stop("Pushover secrets are not configured.", call. = FALSE)
 }
 
 today <- as.Date(lubridate::with_tz(Sys.time(), "Europe/Copenhagen"))
@@ -145,4 +144,14 @@ response <- httr::RETRY(
   httr::timeout(30)
 )
 httr::stop_for_status(response)
-message("Pushover notification sent successfully.")
+response_body <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"))
+request_id <- if (is.null(response_body$request)) "" else response_body$request
+if (!identical(as.integer(response_body$status), 1L) || !nzchar(request_id)) {
+  stop("Pushover returned an invalid success response.", call. = FALSE)
+}
+jsonlite::write_json(
+  list(status = 1L, request = request_id),
+  Sys.getenv("PUSHOVER_RESULT_FILE", "pushover-result.json"),
+  auto_unbox = TRUE
+)
+message("Pushover notification accepted; request ID: ", request_id)
