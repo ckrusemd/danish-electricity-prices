@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "deliveries": {
+    "morning": {
+      "date": "2026-09-22",
+      "sent_at": "2026-09-22T19:14:53+02:00",
+      "run_id": "35759307438",
+      "pushover_request_id": "e06494e5-7916-45fa-a0ec-98eb40a0c351"
+    }
+  }
+}
