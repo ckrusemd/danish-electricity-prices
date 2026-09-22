@@ -113,7 +113,7 @@ jobs:
 
   record-delivery:
     needs: [gate, notify]
-    if: always() && needs.gate.outputs.notify == 'true' && needs.notify.result == 'success'
+    if: always() && (github.event_name == 'schedule' || inputs.scheduled_delivery == true) && needs.gate.outputs.notify == 'true' && needs.notify.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
