@@ -20,6 +20,10 @@ jobs:
           fetch-depth: 0
       - name: Scan repository and history for secrets
         run: bash scripts/secret-scan.sh
+      - name: Set up R for syntax checks
+        uses: r-lib/actions/setup-r@465b7d8e732ca3921382b1674c59bada9cbf3399 # v2
+        with:
+          r-version: '4.6.1'
       - name: Validate repository files
         run: |
           test -f .github/workflows/deploy-pages.yml
