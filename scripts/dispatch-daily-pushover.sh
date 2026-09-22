@@ -11,15 +11,22 @@ GH_BIN="${GH_BIN:-/usr/bin/gh}"
 MAX_ATTEMPTS="${PUSHOVER_MAX_ATTEMPTS:-3}"
 POLL_SECONDS="${PUSHOVER_POLL_SECONDS:-5}"
 
+encoded_repo_file() {
+  local repo="$1" branch="$2" path="$3" response
+  if response="$($GH_BIN api "repos/$repo/contents/$path?ref=$branch" --jq .content 2>/dev/null)"; then
+    printf '%s' "$response"
+  fi
+}
+
 state_date() {
   local repo="$1" branch="$2" state_slot="$3" encoded expected_date
   expected_date="$(TZ=Europe/Copenhagen date +%F)"
-  encoded="$($GH_BIN api "repos/$repo/contents/delivery-state.json?ref=$branch" --jq .content 2>/dev/null || true)"
+  encoded="$(encoded_repo_file "$repo" "$branch" delivery-state.json)"
   if [ -z "$encoded" ]; then
-    encoded="$($GH_BIN api "repos/$repo/contents/notification-state.json?ref=$branch" --jq .content 2>/dev/null || true)"
+    encoded="$(encoded_repo_file "$repo" "$branch" notification-state.json)"
   fi
   if [ -z "$encoded" ]; then
-    encoded="$($GH_BIN api "repos/$repo/contents/delivery_state?ref=$branch" --jq .content 2>/dev/null || true)"
+    encoded="$(encoded_repo_file "$repo" "$branch" delivery_state)"
     if [ -n "$encoded" ]; then
       printf '%s' "$encoded" | tr -d '\n' | base64 --decode 2>/dev/null |
         sed -n "s/^${state_slot}=//p"
@@ -27,7 +34,7 @@ state_date() {
     fi
   fi
   if [ -z "$encoded" ] && [ "$state_slot" = "morning" ]; then
-    encoded="$($GH_BIN api "repos/$repo/contents/last_notification_date?ref=$branch" --jq .content 2>/dev/null || true)"
+    encoded="$(encoded_repo_file "$repo" "$branch" last_notification_date)"
     if [ -n "$encoded" ]; then
       printf '%s' "$encoded" | tr -d '\n' | base64 --decode 2>/dev/null
       return 0
@@ -44,6 +51,12 @@ dispatch_once() {
   local dispatch_id run_id expected_date current_date i
   dispatch_id="local-${state_slot}-$(date +%s)-$$-$RANDOM"
   expected_date="$(TZ=Europe/Copenhagen date +%F)"
+
+  current_date="$(state_date "$repo" "$state_branch" "$state_slot")"
+  if [ "$current_date" = "$expected_date" ]; then
+    echo "Already confirmed $repo $state_slot Pushover delivery for $expected_date"
+    return 0
+  fi
 
   echo "Dispatching $repo/$workflow for $state_slot ($dispatch_id)"
   if [ "$repo" = "ckrusemd/pushoverr-weather-forecast" ]; then
@@ -69,7 +82,12 @@ dispatch_once() {
 
   echo "Watching https://github.com/$repo/actions/runs/$run_id"
   "$GH_BIN" run watch "$run_id" --repo "$repo" --exit-status
-  current_date="$(state_date "$repo" "$state_branch" "$state_slot")"
+  current_date=""
+  for i in $(seq 1 12); do
+    current_date="$(state_date "$repo" "$state_branch" "$state_slot")"
+    [ "$current_date" = "$expected_date" ] && break
+    sleep "$POLL_SECONDS"
+  done
   if [ "$current_date" != "$expected_date" ]; then
     echo "Workflow completed but delivery state is '$current_date', expected '$expected_date'" >&2
     return 1
