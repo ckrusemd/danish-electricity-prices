@@ -11,6 +11,32 @@ GH_BIN="${GH_BIN:-/usr/bin/gh}"
 MAX_ATTEMPTS="${PUSHOVER_MAX_ATTEMPTS:-3}"
 POLL_SECONDS="${PUSHOVER_POLL_SECONDS:-5}"
 
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+lock_file="$runtime_dir/pushover-${slot}.lock"
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "Another $slot Pushover reconciliation is already running; it owns recovery."
+  exit 0
+fi
+
+wait_for_github() {
+  local attempt
+  for attempt in $(seq 1 90); do
+    if "$GH_BIN" api rate_limit --silent >/dev/null 2>&1; then
+      echo "GitHub API is reachable."
+      return 0
+    fi
+    if [ "$attempt" -eq 1 ]; then
+      echo "GitHub API is not reachable yet; waiting for network readiness." >&2
+    fi
+    sleep 10
+  done
+  echo "GitHub API did not become reachable within 15 minutes." >&2
+  return 1
+}
+
+wait_for_github
+
 encoded_repo_file() {
   local repo="$1" branch="$2" path="$3" response
   if response="$($GH_BIN api "repos/$repo/contents/$path?ref=$branch" --jq .content 2>/dev/null)"; then

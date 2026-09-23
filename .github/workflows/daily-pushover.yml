@@ -38,6 +38,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 300
     outputs:
       notify: ${{ steps.gate.outputs.notify }}
       slot: ${{ steps.gate.outputs.slot }}
@@ -45,6 +46,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
+      - name: Wait until the Copenhagen delivery window
+        if: github.event_name == 'schedule'
+        shell: bash
+        run: |
+          set -euo pipefail
+          now_epoch="$(date +%s)"
+          target_epoch="$(TZ=Europe/Copenhagen date -d 'today 05:00' +%s)"
+          if [ "$now_epoch" -lt "$target_epoch" ]; then
+            wait_seconds="$((target_epoch - now_epoch))"
+            echo "Scheduled fallback arrived early; waiting ${wait_seconds}s until 05:00 Europe/Copenhagen."
+            sleep "$wait_seconds"
+          fi
       - id: gate
         shell: bash
         env:
