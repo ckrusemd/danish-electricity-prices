@@ -26,8 +26,9 @@ on:
         default: manual
         type: string
   schedule:
-    # Recheck every 15 minutes; the gate exits quickly until the morning slot is due.
-    - cron: "7,22,37,52 * * * *"
+    # Trigger near 05:00 Copenhagen in both CET and CEST; retain hourly recovery checks.
+    - cron: "5 3,4 * * *"
+    - cron: "37 * * * *"
 
 permissions:
   contents: read
