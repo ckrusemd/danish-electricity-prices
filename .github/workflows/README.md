@@ -11,7 +11,9 @@ CET/CEST daylight-saving offset. Its state is independent from notifications.
 timer dispatches it at 05:05 Europe/Copenhagen and waits for confirmed Pushover
 acceptance. An hourly Actions watchdog catches up a missing delivery. The
 `electricity-notification-state` branch records the date, run ID and Pushover
-request ID to prevent duplicate delivery.
+request ID to prevent duplicate delivery. UTC schedule candidates target
+05:05 in both CET and CEST, and the hourly watchdog recovers a delayed or
+skipped candidate. Early or already completed runs exit without waiting.
 
 `build-container.yml` rebuilds and publishes
 `ghcr.io/ckrusemd/danish-electricity-prices-r` when the Dockerfile or locked R
