@@ -2,10 +2,10 @@
   "schema_version": 1,
   "deliveries": {
     "morning": {
-      "date": "2026-10-04",
-      "sent_at": "2026-10-04T11:38:52+02:00",
-      "run_id": "37192766913",
-      "pushover_request_id": "9d5f076a-72eb-431d-be22-0814123ac176"
+      "date": "2026-10-05",
+      "sent_at": "2026-10-05T09:40:02+02:00",
+      "run_id": "37278902266",
+      "pushover_request_id": "3ed1ea9d-4715-4368-bf4e-7c50569a2c6d"
     }
   }
 }
