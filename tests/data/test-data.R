@@ -243,34 +243,74 @@ check(identical(load_or_prepare_analysis(FALSE), without), "environment fixture 
 Sys.unsetenv("ELECTRICITY_FIXTURE")
 
 # Partial upcoming publication is valid and explicitly provisional, not fabricated.
-original_fetch <- fetch_quarter_hour_prices
-original_history <- load_historical_prices
-fetch_quarter_hour_prices <- function(price_area, start, end, ...) {
-  fixture_quarter_prices(start, start + 3600, price_area)
-}
-load_historical_prices <- function(price_area, start, end, ...) fixture_quarter_prices(start, end, price_area)
+original_inputs <- load_price_inputs
+load_price_inputs <- function(start, today, end, ...) fixture_quarter_prices(start, today + 3600)
 partial <- prepare_analysis(now, fixture = FALSE, include_weather = FALSE, cache_dir = cache_dir)
 check(!partial$meta$coverage$prices$DK1$upcoming$complete, "unpublished next hours incomplete")
 check(partial$meta$coverage$prices$DK1$upcoming$observed == 0L, "no invented future prices")
 check(nrow(partial$summaries$DK1$upcoming_window) == 0L, "unavailable upcoming window zero rows")
 check(partial$meta$coverage$prices$DK1$upcoming$window_provisional, "provisional window flag")
-fetch_quarter_hour_prices <- original_fetch
-load_historical_prices <- original_history
+load_price_inputs <- original_inputs
 
 # The complete preparation boundary always refreshes current inputs, but caches history.
 prepare_calls <- list()
-fetch_quarter_hour_prices <- function(price_area, start, end, ...) {
-  prepare_calls[[length(prepare_calls) + 1L]] <<- list(zone = price_area, start = start, end = end)
-  fixture_quarter_prices(start, end, price_area)
+original_fetch <- fetch_quarter_hour_prices_batched
+fetch_quarter_hour_prices_batched <- function(start, end, ...) {
+  prepare_calls[[length(prepare_calls) + 1L]] <<- list(start = start, end = end)
+  fixture_quarter_prices(start, end)
 }
 prepare_cache <- file.path(scratch, "prepare-cache")
 invisible(prepare_analysis(now, include_weather = FALSE, cache_dir = prepare_cache))
-check(length(prepare_calls) == 4L, "first preparation one history and one current range per zone")
+check(length(prepare_calls) == 1L, "cold preparation one batched price GET for both zones")
 prepare_calls <- list()
 invisible(prepare_analysis(now + 3600, include_weather = FALSE, cache_dir = prepare_cache))
-check(length(prepare_calls) == 2L, "repeat preparation only two fresh current queries")
+check(length(prepare_calls) == 1L, "repeat preparation one fresh current query for both zones")
 check(all(vapply(prepare_calls, function(x) identical(x$start, day_start(snapshot$date)), logical(1))), "fresh query starts today, avoiding history overlap")
-fetch_quarter_hour_prices <- original_fetch
+prepare_calls <- list()
+invisible(prepare_analysis(now + 86400, include_weather = FALSE, cache_dir = prepare_cache))
+check(length(prepare_calls) == 1L && identical(prepare_calls[[1L]]$start, day_start(snapshot$date)),
+  "rollover combines newly completed history and refreshed current inputs in one GET")
+batch_cache_path <- file.path(prepare_cache, "v1-prices-both.rds")
+cached_batch <- readRDS(batch_cache_path)
+check(all(cached_batch$data$TimeUTC < day_start(as.Date(snapshot$date) + 1L)),
+  "batch cache never contains current-day prices")
+cached_batch$data <- cached_batch$data[cached_batch$data$PriceArea == "DK1", ]
+saveRDS(cached_batch, batch_cache_path)
+prepare_calls <- list()
+invisible(prepare_analysis(now + 86400, include_weather = FALSE, cache_dir = prepare_cache))
+check(length(prepare_calls) == 1L && prepare_calls[[1L]]$start == day_start(six_months_before(as.Date(snapshot$date) + 1L)),
+  "missing zone invalidates history cache and cold refresh still uses one GET")
+fetch_quarter_hour_prices_batched <- function(start, end, ...) {
+  data <- fixture_quarter_prices(start, end)
+  data[-1L, ]
+}
+expect_error(prepare_analysis(now, include_weather = FALSE, cache_dir = file.path(scratch, "incomplete-batch")),
+  "Incomplete historical")
+fetch_quarter_hour_prices_batched <- original_fetch
+
+batch_start <- day_start("2026-10-01")
+batch_end <- day_start("2026-10-02")
+batch_fixture <- fixture_quarter_prices(batch_start, batch_end)
+batch_records <- data.frame(TimeUTC = iso_utc(batch_fixture$TimeUTC),
+  PriceArea = batch_fixture$PriceArea, DayAheadPriceDKK = batch_fixture$SpotPriceDKK * 1000,
+  DayAheadPriceEUR = batch_fixture$SpotPriceEUR * 1000)
+batch_queries <- list()
+batched <- fetch_quarter_hour_prices_batched(batch_start, batch_end, get_json = function(url, query) {
+  batch_queries[[length(batch_queries) + 1L]] <<- query
+  list(records = batch_records, total = nrow(batch_records))
+})
+check(length(batch_queries) == 1L && identical(batch_queries[[1L]]$filter, '{"PriceArea":["DK1","DK2"]}'),
+  "one provider query filters both zones")
+check(identical(batch_queries[[1L]]$timezone, "utc") && batch_queries[[1L]]$limit == 50000L,
+  "batch query is UTC and explicitly bounded")
+same(batched$SpotPriceDKK, batch_fixture$SpotPriceDKK, "batch DKK conversion exactly once")
+expect_error(fetch_quarter_hour_prices_batched(batch_start, batch_end, get_json = function(...) {
+  list(records = batch_records, total = nrow(batch_records) + 1L)
+}), "truncated")
+expect_error(fetch_quarter_hour_prices_batched(batch_start, batch_start + 400 * 86400), "bounded batch")
+expect_error(fetch_quarter_hour_prices_batched(batch_start, batch_end, get_json = function(...) {
+  list(records = rbind(batch_records, batch_records[1L, ]))
+}), "Duplicate")
 
 # Project sourcing also resolves paths outside the project working directory.
 root <- getwd()

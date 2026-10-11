@@ -26,7 +26,7 @@ validate_quarter_prices <- function(data) {
 
 normalise_price_records <- function(records, price_area) {
   assert_columns(records, c("TimeUTC", "PriceArea", "DayAheadPriceDKK"), "DayAheadPrices records")
-  if (anyNA(records$PriceArea) || any(records$PriceArea != price_area)) stop("DayAheadPrices returned an unexpected zone")
+  if (anyNA(records$PriceArea) || any(!records$PriceArea %in% price_area)) stop("DayAheadPrices returned an unexpected zone")
   # Source DKK/MWh -> DKK/kWh, exactly once. Local strings are ambiguous at DST.
   time <- utc_time(records$TimeUTC)
   result <- data.frame(TimeUTC = time, TimeDK = dk_time(time),
@@ -37,6 +37,68 @@ normalise_price_records <- function(records, price_area) {
   rownames(result) <- NULL
   validate_quarter_prices(result)
   result
+}
+
+fetch_quarter_hour_prices_batched <- function(start, end, get_json = api_get_json) {
+  assert_time(start, "UTC", "batch start", 900)
+  assert_time(end, "UTC", "batch end", 900)
+  # Two zones over six calendar months fit in one bounded request. Current
+  # and newly completed historical quarters share this request, not pagination.
+  limit <- 50000L
+  if (length(start) != 1L || length(end) != 1L || start >= end ||
+      2 * (as.numeric(end) - as.numeric(start)) / 900 > limit) {
+    stop("Invalid bounded batch price range", call. = FALSE)
+  }
+  payload <- get_json(price_endpoint, list(
+    filter = '{"PriceArea":["DK1","DK2"]}',
+    start = format(start, "%Y-%m-%dT%H:%M", tz = "UTC"),
+    end = format(end, "%Y-%m-%dT%H:%M", tz = "UTC"),
+    sort = "TimeUTC ASC", timezone = "utc", limit = limit,
+    columns = "TimeUTC,PriceArea,DayAheadPriceDKK,DayAheadPriceEUR"))
+  records <- payload$records
+  if (is.list(records) && !length(records)) return(empty_quarter_prices())
+  assert_columns(records, c("TimeUTC", "PriceArea", "DayAheadPriceDKK"), "DayAheadPrices records")
+  if (nrow(records) >= limit || (!is.null(payload$total) && payload$total > nrow(records))) {
+    stop("DayAheadPrices batch response is truncated", call. = FALSE)
+  }
+  result <- normalise_price_records(records, c("DK1", "DK2"))
+  if (any(result$TimeUTC < start | result$TimeUTC >= end)) stop("Prices exceed batch query range")
+  result
+}
+
+load_price_inputs <- function(start, today, end, cache_dir,
+                              fetch = fetch_quarter_hour_prices_batched) {
+  key <- "utc-quarters-both"
+  path <- file.path(cache_dir, "v1-prices-both.rds")
+  cached <- read_input_cache(path, price_provider, key)
+  valid <- !is.null(cached) && tryCatch({
+    validate_quarter_prices(cached$data)
+    assert_time(cached$start, "UTC", "cached start", 900)
+    assert_time(cached$end, "UTC", "cached end", 900)
+    length(cached$start) == 1L && length(cached$end) == 1L &&
+      cached$start <= start && cached$end > start && cached$end <= today &&
+      all(cached$data$TimeUTC >= cached$start & cached$data$TimeUTC < cached$end) &&
+      all(vapply(c("DK1", "DK2"), function(zone) price_range_coverage(
+        cached$data[cached$data$PriceArea == zone, , drop = FALSE],
+        cached$start, cached$end)$complete, logical(1)))
+  }, error = function(e) FALSE)
+  fetch_start <- if (valid) cached$end else start
+  # Exactly one GET even on a cold cache. Never reuse cached current-day prices.
+  data <- fetch(start = fetch_start, end = end)
+  if (valid) data <- rbind(cached$data[cached$data$TimeUTC >= start &
+    cached$data$TimeUTC < fetch_start, , drop = FALSE], data)
+  data <- data[order(data$PriceArea, data$TimeUTC), , drop = FALSE]
+  rownames(data) <- NULL
+  validate_quarter_prices(data)
+  if (any(data$TimeUTC < start | data$TimeUTC >= end)) stop("Prices exceed requested input range")
+  for (zone in c("DK1", "DK2")) {
+    if (!price_range_coverage(data[data$PriceArea == zone, , drop = FALSE], start, today)$complete) {
+      stop("Incomplete historical UTC quarter coverage for ", zone)
+    }
+  }
+  historical <- data[data$TimeUTC < today, , drop = FALSE]
+  write_input_cache(path, price_provider, key, historical, start, today)
+  data
 }
 
 fetch_quarter_hour_prices <- function(price_area = c("DK1", "DK2"), limit = 10000L,
