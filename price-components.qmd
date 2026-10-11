@@ -1,0 +1,81 @@
+---
+title: "Price components · Radius / Andel"
+---
+
+```{r}
+#| label: setup
+#| include: false
+source("R/project.R")
+source("scripts/site-helpers.R")
+snapshot <- site_read_snapshot()
+```
+
+::: {.publication-hero .zone-hero}
+::: {.eyebrow}
+Consumer scenario · Copenhagen
+:::
+
+## Understand the price you can act on
+
+The hourly consumer-price estimate represents a private customer in Radius'
+grid area with an Andel Energi FlexEnergi agreement. It includes VAT and variable
+charges; fixed subscriptions are separate.
+:::
+
+```{r}
+#| results: asis
+site_metadata(snapshot, "DK2")
+```
+
+## Wholesale and consumer prices
+
+The **wholesale spot price** is the market price for DK1 or DK2 in DKK/kWh,
+before VAT and retail charges. Quarter-hour charts, historical profiles,
+period averages and cheapest-window recommendations all use this basis.
+
+The **consumer scenario** adds the configured VAT, supplier add-on, Radius
+time-dependent network tariff, Energinet variable tariffs and electricity tax
+to the hourly price. These calculations are performed once in the shared
+analysis; pages display the resulting snapshot columns.
+
+| Component | How to read it |
+|:--|:--|
+| Wholesale spot | Changes with the bidding zone and delivery interval; can be negative |
+| VAT | Applied according to the configured scenario |
+| Andel FlexEnergi add-on | Variable supplier charge from the scenario |
+| Radius network tariff | Depends on local hour and season |
+| Energinet tariffs | Variable system and network charges |
+| Electricity tax | Scenario tax rate; special arrangements may differ |
+| Fixed subscriptions | Excluded from the marginal hourly kWh price |
+
+## Values carried by this snapshot
+
+The following table shows the first available DK2 hour on the snapshot date.
+Component columns retain the units used by the shared tariff module: variable
+charges are in øre/kWh, while wholesale and total prices are in DKK/kWh.
+
+```{r}
+#| results: asis
+prices <- snapshot$summaries$DK2$today
+columns <- c(HourUTC = "Hour (Copenhagen)", SpotPriceDKK = "Wholesale spot (DKK/kWh)",
+             RadiusNettarifInclMoms = "Radius incl. VAT (øre/kWh)",
+             AndelPristillaeg = "Andel add-on (øre/kWh)",
+             EnerginetTarif = "Energinet before VAT (øre/kWh)",
+             elafgift = "Electricity tax before VAT (øre/kWh)",
+             SpotPriceDKK_Total = "Consumer scenario incl. VAT (DKK/kWh)")
+available <- intersect(names(columns), names(prices))
+sample <- utils::head(prices[, available, drop = FALSE], 1)
+names(sample) <- unname(columns[available])
+site_table(sample, "DK2 · one hourly example from the prepared snapshot")
+```
+
+## Scope and sources
+
+This scenario is specific to Radius / Andel and is not a universal Danish or
+DK1 consumer price. Supplier contracts, fixed fees, own generation, exemptions
+and installation-specific charges can alter an actual bill. Rates can change;
+the scenario metadata above records what the snapshot used.
+
+The repository's [detailed price-component documentation](https://github.com/ckrusemd/danish-electricity-prices/blob/master/PRICE_COMPONENTS.md)
+provides tariff source links and subscription context. Market and weather
+providers and coverage are recorded in the snapshot rather than inferred by the pages.

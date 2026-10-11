@@ -5,30 +5,35 @@ on:
   workflow_dispatch:
     inputs:
       delivery_slot:
-        description: Delivery slot (electricity supports morning only)
+        description: Electricity supports the morning slot only
         required: true
         default: morning
         type: choice
-        options: [morning, afternoon]
+        options: [morning]
       scheduled_delivery:
-        description: Respect the daily delivery lock
+        description: Respect 05:00 Copenhagen admission and the daily journal
         required: true
         default: true
         type: boolean
       force_send:
-        description: Send even when this slot is already recorded
+        description: Manual send without a daily record (scheduled_delivery must be false)
         required: false
         default: false
         type: boolean
+      trigger_source:
+        description: Scheduler source for run identification
+        required: false
+        default: manual
+        type: choice
+        options: [manual, external, local]
       dispatch_id:
-        description: Correlation ID used by the external scheduler
+        description: Optional scheduler correlation ID
         required: false
         default: manual
         type: string
   schedule:
-    # Trigger near 05:00 Copenhagen in both CET and CEST; retain hourly recovery checks.
-    - cron: "5 3,4 * * *"
-    - cron: "37 * * * *"
+    - cron: "37 5-23 * * *"
+      timezone: Europe/Copenhagen
 
 permissions:
   contents: read
@@ -42,130 +47,99 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      notify: ${{ steps.gate.outputs.notify }}
+      action: ${{ steps.gate.outputs.action }}
+      date: ${{ steps.gate.outputs.date }}
       slot: ${{ steps.gate.outputs.slot }}
+      attempt: ${{ steps.gate.outputs.attempt }}
+      record_daily: ${{ steps.gate.outputs.record_daily }}
+      image: ${{ steps.image.outputs.image }}
+      environment_hash: ${{ steps.image.outputs.environment_hash }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 1
-      - id: gate
-        shell: bash
+          persist-credentials: false
+      - name: Admit morning delivery or receipt recovery
+        id: gate
         env:
+          GH_TOKEN: ${{ github.token }}
           REQUESTED_SLOT: ${{ inputs.delivery_slot || 'morning' }}
-          SCHEDULED_DELIVERY: ${{ inputs.scheduled_delivery || false }}
+          SCHEDULED_DELIVERY: ${{ github.event_name == 'schedule' || inputs.scheduled_delivery == true }}
           FORCE_SEND: ${{ inputs.force_send || false }}
+        run: python3 scripts/notification-state.py gate
+      - name: Resolve verified environment image
+        id: image
+        if: steps.gate.outputs.action != 'skip'
+        run: python3 scripts/notification-image.py
+      - name: Gate summary
+        if: always()
+        env:
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+          IMAGE_OUTCOME: ${{ steps.image.outcome }}
+          GATE_ACTION: ${{ steps.gate.outputs.action }}
         run: |
-          set -euo pipefail
-          slot="$REQUESTED_SLOT"
-          if [ "$slot" != "morning" ]; then
-            echo "Electricity notifications support the morning slot only." >&2
-            exit 1
-          fi
-          local_date="$(TZ=Europe/Copenhagen date +%F)"
-          local_hour="$(TZ=Europe/Copenhagen date +%H)"
-          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
-          state="$(git show origin/electricity-notification-state:delivery-state.json 2>/dev/null || printf '{}')"
-          sent_date="$(printf '%s' "$state" | jq -r --arg slot "$slot" '.deliveries[$slot].date // empty' 2>/dev/null || true)"
-          if [ -z "$sent_date" ]; then
-            sent_date="$(git show origin/electricity-notification-state:last_notification_date 2>/dev/null || true)"
-          fi
-          notify=false
-          if [ "$FORCE_SEND" = "true" ]; then
-            notify=true
-          elif { [ "${{ github.event_name }}" = "schedule" ] || [ "$SCHEDULED_DELIVERY" = "true" ]; } \
-               && [ "$((10#$local_hour))" -ge 5 ] && [ "$sent_date" != "$local_date" ]; then
-            notify=true
-          fi
-          echo "slot=$slot" >> "$GITHUB_OUTPUT"
-          echo "notify=$notify" >> "$GITHUB_OUTPUT"
-          echo "Electricity gate: date=$local_date hour=$local_hour sent=$sent_date notify=$notify"
+          echo "Notification gate: action=$GATE_ACTION gate=$GATE_OUTCOME environment=$IMAGE_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          test "$GATE_OUTCOME" = success
+          if [ "$GATE_ACTION" != skip ]; then test "$IMAGE_OUTCOME" = success; fi
 
-  notify:
+  delivery:
     needs: gate
-    if: needs.gate.outputs.notify == 'true'
+    if: needs.gate.outputs.action == 'send' || needs.gate.outputs.action == 'recover'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      request_id: ${{ steps.send.outputs.request_id }}
-    container:
-      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
-      options: --user root
-    steps:
-      - uses: actions/checkout@v7
-      - name: Validate notification configuration
-        shell: bash
-        env:
-          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
-          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
-        run: |
-          test -n "$PUSHOVER_APP_TOKEN"
-          test -n "$PUSHOVER_USER_KEY"
-      - name: Send electricity notification
-        id: send
-        shell: bash
-        env:
-          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
-          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
-          PUSHOVER_RESULT_FILE: pushover-result.json
-        run: |
-          set -euo pipefail
-          Rscript --vanilla scripts/send-pushover.R
-          request_id="$(Rscript --vanilla -e 'result <- jsonlite::read_json("pushover-result.json", simplifyVector = TRUE); cat(if (is.null(result$request)) "" else result$request)')"
-          test -n "$request_id"
-          echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
-
-  record-delivery:
-    needs: [gate, notify]
-    if: always() && (github.event_name == 'schedule' || inputs.scheduled_delivery == true) && needs.gate.outputs.notify == 'true' && needs.notify.result == 'success'
-    runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
+    container:
+      image: ${{ needs.gate.outputs.image }}
+      options: --user root
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NOTIFICATION_DATE: ${{ needs.gate.outputs.date }}
+      NOTIFICATION_RECORD_DAILY: ${{ needs.gate.outputs.record_daily }}
+      NOTIFICATION_ATTEMPT: ${{ needs.gate.outputs.attempt || format('{0}-{1}', github.run_id, github.run_attempt) }}
+      NOTIFICATION_ARTIFACT: notification-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+      PUSHOVER_RESULT_FILE: pushover-result.json
+      ELECTRICITY_DATA_FILE: notification-data.rds
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 1
-      - name: Record confirmed Pushover delivery
-        shell: bash
+          persist-credentials: false
+      - name: Verify locked runtime and environment fingerprint
+        run: Rscript --vanilla scripts/verify-environment.R --image
+      - name: Recover confirmed receipt without a notification POST
+        id: recover
+        if: needs.gate.outputs.action == 'recover'
+        run: python3 scripts/notification-state.py recover
+      - name: Prepare shared snapshot without weather
+        if: needs.gate.outputs.action == 'send'
+        run: Rscript --vanilla scripts/prepare-data.R --without-weather --output notification-data.rds
+      - name: Claim, send once, and immediately record acceptance
+        id: send
+        if: needs.gate.outputs.action == 'send'
         env:
-          DELIVERY_SLOT: ${{ needs.gate.outputs.slot }}
-          PUSHOVER_REQUEST_ID: ${{ needs.notify.outputs.request_id }}
-        run: |
-          set -euo pipefail
-          local_date="$(TZ=Europe/Copenhagen date +%F)"
-          sent_at="$(TZ=Europe/Copenhagen date --iso-8601=seconds)"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin electricity-notification-state:refs/remotes/origin/electricity-notification-state 2>/dev/null || true
-          state="$(git show origin/electricity-notification-state:delivery-state.json 2>/dev/null || printf '{}')"
-          if ! printf '%s' "$state" | jq -e . >/dev/null 2>&1; then state='{}'; fi
-          if git show-ref --verify --quiet refs/remotes/origin/electricity-notification-state; then
-            git checkout -B electricity-notification-state origin/electricity-notification-state
-          else
-            git checkout --orphan electricity-notification-state
-            git rm -rf . || true
-          fi
-          printf '%s' "$state" | jq \
-            --arg slot "$DELIVERY_SLOT" --arg date "$local_date" --arg sent_at "$sent_at" \
-            --arg run_id "$GITHUB_RUN_ID" --arg request_id "$PUSHOVER_REQUEST_ID" \
-            '.schema_version = 1 | .deliveries[$slot] = {date: $date, sent_at: $sent_at, run_id: $run_id, pushover_request_id: $request_id}' \
-            > delivery-state.json
-          git add delivery-state.json
-          git commit -m "Record $DELIVERY_SLOT electricity notification for $local_date"
-          git push origin electricity-notification-state
-
-  summary:
-    needs: [gate, notify, record-delivery]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify workflow outcome
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: Rscript --vanilla scripts/send-pushover.R
+      - name: Preserve confirmed receipt even if journal write failed
+        if: always() && needs.gate.outputs.action == 'send' && hashFiles('pushover-result.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: notification-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: pushover-result.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Delivery summary
+        if: always()
         env:
-          NOTIFY_REQUIRED: ${{ needs.gate.outputs.notify }}
-          NOTIFY_RESULT: ${{ needs.notify.result }}
-          RECORD_RESULT: ${{ needs.record-delivery.result }}
-          REQUEST_ID: ${{ needs.notify.outputs.request_id }}
+          ACTION: ${{ needs.gate.outputs.action }}
+          SEND_OUTCOME: ${{ steps.send.outcome }}
+          RECOVER_OUTCOME: ${{ steps.recover.outcome }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          echo "required=$NOTIFY_REQUIRED notify=$NOTIFY_RESULT record=$RECORD_RESULT request=$REQUEST_ID"
-          if [ "$NOTIFY_REQUIRED" = "true" ] && { [ "$NOTIFY_RESULT" != "success" ] || [ "$RECORD_RESULT" != "success" ]; }; then
-            exit 1
-          fi
+          expected=accepted-and-recorded
+          if [ "$NOTIFICATION_RECORD_DAILY" = false ]; then expected=accepted-unrecorded-manual; fi
+          if [ "$ACTION" = recover ]; then expected=receipt-recovered-without-resend; fi
+          echo "Notification delivery: expected=$expected send=$SEND_OUTCOME recovery=$RECOVER_OUTCOME job=$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          test "$JOB_STATUS" = success
+          if [ "$ACTION" = send ]; then test "$SEND_OUTCOME" = success; else test "$RECOVER_OUTCOME" = success; fi

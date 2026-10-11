@@ -1,0 +1,72 @@
+project:
+  type: website
+  output-dir: _site
+  execute-dir: project
+  render:
+    - index.qmd
+    - east-denmark.qmd
+    - west-denmark.qmd
+    - heatpump.qmd
+    - price-components.qmd
+  post-render:
+    - Rscript scripts/site-redirects.R
+
+website:
+  title: "Danish Electricity Prices"
+  description: "Quarter-hour spot prices and practical electricity-use windows for Denmark."
+  navbar:
+    background: dark
+    left:
+      - href: index.qmd
+        text: Overview
+      - href: east-denmark.qmd
+        text: East · DK2
+      - href: west-denmark.qmd
+        text: West · DK1
+    right:
+      - icon: github
+        href: https://github.com/ckrusemd/danish-electricity-prices
+        aria-label: Source repository
+  sidebar:
+    style: docked
+    search: true
+    contents:
+      - index.qmd
+      - section: Electricity prices
+        contents:
+          - east-denmark.qmd
+          - west-denmark.qmd
+      - section: Context & methods
+        contents:
+          - heatpump.qmd
+          - price-components.qmd
+  page-footer:
+    left: "Copenhagen time · Prices in DKK/kWh"
+    right:
+      - text: Source & methods
+        href: https://github.com/ckrusemd/danish-electricity-prices
+
+format:
+  html:
+    theme: darkly
+    css: style.css
+    include-in-header: header.html
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: Show analysis code
+    code-copy: true
+    fig-format: svg
+    fig-width: 10
+    fig-height: 5.5
+    fig-dpi: 144
+    link-external-newwindow: true
+    smooth-scroll: false
+
+execute:
+  freeze: false
+  cache: false
+  echo: false
+  warning: false
+  message: false
+  error: false

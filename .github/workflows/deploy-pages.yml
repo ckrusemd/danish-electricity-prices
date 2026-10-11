@@ -2,83 +2,131 @@ name: Build and deploy electricity prices
 
 on:
   workflow_dispatch:
+    inputs:
+      scheduled_delivery:
+        description: External 05:00 Copenhagen daily delivery (shares cron deduplication)
+        type: boolean
+        default: false
+      trigger_source:
+        description: Origin of this dispatch
+        type: string
+        default: manual
   push:
     branches: [master]
     paths:
-      - "**.R"
-      - "**.Rmd"
-      - "_bookdown.yml"
-      - "style.css"
-      - "header.html"
-      - "index.Rmd"
-      - ".github/workflows/deploy-pages.yml"
+      - '**.R'
+      - '**.qmd'
+      - _quarto.yml
+      - style.css
+      - header.html
+      - Dockerfile
+      - .dockerignore
+      - renv.lock
+      - renvinfra/**
+      - .Rprofile
+      - scripts/**
+      - tests/**
+      - .github/workflows/build-container.yml
+      - .github/workflows/deploy-pages.yml
   schedule:
-    # Two UTC candidates cover 05:17 in Copenhagen across DST. The Pages
-    # state branch ensures that delayed or duplicate starts deploy only once.
-    - cron: "7,22,37,52 3,4 * * *"
+    - cron: '37 5-23 * * *'
+      timezone: Europe/Copenhagen
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: electricity-pages
+  cancel-in-progress: false
 
 jobs:
   schedule-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       deploy: ${{ steps.gate.outputs.deploy }}
+      date: ${{ steps.gate.outputs.date }}
+      daily: ${{ steps.gate.outputs.daily }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-      - name: Check Copenhagen schedule
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check shared Copenhagen daily state
         id: gate
+        env:
+          SCHEDULED_DELIVERY: ${{ inputs.scheduled_delivery || false }}
+          TRIGGER_SOURCE: ${{ inputs.trigger_source || github.event_name }}
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-          else
-            deploy=false
-            local_date=$(TZ=Europe/Copenhagen date +%F)
-            local_hour=$(TZ=Europe/Copenhagen date +%H)
-            git fetch origin electricity-pages-state:refs/remotes/origin/electricity-pages-state 2>/dev/null || true
-            last_deployed=$(git show origin/electricity-pages-state:last_deployment_date 2>/dev/null || true)
-            if [ "$((10#$local_hour))" -ge 5 ] && [ "$last_deployed" != "$local_date" ]; then
-              deploy=true
-            fi
-            echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          last_date=
+          state_ref=$(git ls-remote --heads origin electricity-pages-state)
+          if [[ -n "$state_ref" ]]; then
+            git fetch --no-tags --depth=1 origin electricity-pages-state
+            last_date=$(git show FETCH_HEAD:last_deployment_date)
+            [[ "$last_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
           fi
+          bash scripts/environment-pages-gate.sh "$last_date" | tee -a "$GITHUB_OUTPUT"
+          echo "trigger_source=$TRIGGER_SOURCE" >> "$GITHUB_STEP_SUMMARY"
 
-  build:
+  environment:
     needs: schedule-gate
     if: needs.schedule-gate.outputs.deploy == 'true'
+    uses: ./.github/workflows/build-container.yml
+    permissions:
+      contents: read
+      packages: write
+
+  build:
+    needs: [schedule-gate, environment]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
     container:
-      image: ghcr.io/ckrusemd/danish-electricity-prices-r:latest
-      options: --user root
+      image: ${{ needs.environment.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      ELECTRICITY_DATA_FILE: ${{ github.workspace }}/.cache/analysis.rds
+      EXPECTED_DATE: ${{ needs.schedule-gate.outputs.date }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-      - name: Check repository configuration
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Verify immutable environment before using it
+        run: Rscript --vanilla scripts/verify-environment.R --image
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .cache/data
+          key: electricity-data-v1-${{ needs.schedule-gate.outputs.date }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: electricity-data-v1-
+      - name: Prepare exactly one shared snapshot
         run: |
-          test -f renv.lock
-          test -f _bookdown.yml
-          test -f index.Rmd
-          test -n "${{ secrets.OPENWEATHERMAP_APIKEY }}"
+          started=$(date +%s)
+          Rscript --vanilla scripts/prepare-data.R --output "$ELECTRICITY_DATA_FILE"
+          # Preserve R's $ operator; the shell must not expand this expression.
+          # shellcheck disable=SC2016
+          Rscript --vanilla -e 'source("R/project.R"); x <- read_analysis(Sys.getenv("ELECTRICITY_DATA_FILE")); stopifnot(x$date == Sys.getenv("EXPECTED_DATE"))'
+          echo "PREPARE_SECONDS=$(( $(date +%s) - started ))" >> "$GITHUB_ENV"
+      - name: Render snapshot consumers
+        run: |
+          started=$(date +%s)
+          quarto render
+          echo "RENDER_SECONDS=$(( $(date +%s) - started ))" >> "$GITHUB_ENV"
+      - name: Validate rendered links and assets
+        run: Rscript --vanilla scripts/site-check.R --rendered
+      - name: Record artifact provenance and performance counters
         env:
-          OPENWEATHERMAP_APIKEY: ${{ secrets.OPENWEATHERMAP_APIKEY }}
-      - name: Validate shared R code
-        run: Rscript --vanilla -e 'parse(file = "R/data.R")'
-      - name: Render site
-        env:
-          OPENWEATHERMAP_APIKEY: ${{ secrets.OPENWEATHERMAP_APIKEY }}
-        run: Rscript --vanilla -e 'bookdown::render_book("index.Rmd", output_dir = "_site")'
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+          IMAGE: ${{ needs.environment.outputs.image }}
+          ENVIRONMENT_HASH: ${{ needs.environment.outputs.environment_hash }}
+          BUILD_MODE: ${{ needs.environment.outputs.build_mode }}
+          BUILD_SECONDS: ${{ needs.environment.outputs.build_seconds }}
+        run: |
+          Rscript --vanilla renvinfra/provenance.R "$ELECTRICITY_DATA_FILE" data-provenance.json
+          cat data-provenance.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: pages-provenance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data-provenance.json
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: _site
           retention-days: 1
@@ -95,35 +143,32 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy validated Pages artifact
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
 
   record-deployment:
-    needs: deploy
-    if: github.event_name == 'schedule' && needs.deploy.result == 'success'
+    needs: [schedule-gate, deploy]
+    if: needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-      - name: Record successful deployment
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Record success on independent state branch
+        env:
+          DEPLOYMENT_DATE: ${{ needs.schedule-gate.outputs.date }}
         shell: bash
         run: |
-          local_date=$(TZ=Europe/Copenhagen date +%F)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin electricity-pages-state:refs/remotes/origin/electricity-pages-state 2>/dev/null || true
-          if git show-ref --verify --quiet refs/remotes/origin/electricity-pages-state; then
-            git checkout -B electricity-pages-state origin/electricity-pages-state
-          else
-            git checkout --orphan electricity-pages-state
-            git rm -rf . || true
+          parent_args=()
+          state_ref=$(git ls-remote --heads origin electricity-pages-state)
+          if [[ -n "$state_ref" ]]; then
+            git fetch --no-tags --depth=1 origin electricity-pages-state
+            parent_args=(-p "$(git rev-parse FETCH_HEAD)")
           fi
-          printf '%s\n' "$local_date" > last_deployment_date
-          git add last_deployment_date
-          git commit -m "Record electricity deployment for $local_date"
-          git push origin electricity-pages-state
+          blob=$(printf '%s\n' "$DEPLOYMENT_DATE" | git hash-object -w --stdin)
+          tree=$(printf '100644 blob %s\tlast_deployment_date\n' "$blob" | git mktree)
+          commit=$(printf 'Record electricity deployment for %s\n' "$DEPLOYMENT_DATE" | git commit-tree "$tree" "${parent_args[@]}")
+          git push origin "$commit:refs/heads/electricity-pages-state"

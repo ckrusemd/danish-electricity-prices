@@ -1,0 +1,7 @@
+lock <- jsonlite::fromJSON("renv.lock", simplifyVector = FALSE)
+stopifnot(lock$R$Version == "4.6.1")
+roots <- c("ggplot2", "httr", "jsonlite", "knitr", "rmarkdown", "yaml")
+stopifnot(all(roots %in% names(lock$Packages)))
+stopifnot(!any(c("caret", "rPref", "Matrix", "bookdown") %in% names(lock$Packages)))
+source("scripts/verify-environment.R")
+stopifnot(any(grepl("libuv1-dev", readLines("Dockerfile"), fixed = TRUE)))

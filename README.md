@@ -1,95 +1,107 @@
 # Danish Electricity Prices
 
-Automated analysis and forecasting of Danish electricity spot prices for the East (DK2) and West (DK1) price areas.
+A daily Quarto website for DK1 (West) and DK2 (East), with Pushover notifications
+and a heat-pump price/temperature heat map.
 
-Built as a [bookdown](https://bookdown.org/) site, deployed via GitHub Actions and published to GitHub Pages.
+[Open the publication](https://ckrusemd.github.io/danish-electricity-prices/).
 
-## Features
+## One calculation pipeline
 
-- Fetches current day-ahead prices from the [Energi Data Service API](https://www.energidataservice.dk/)
-- Calculates total consumer price including transport tariffs and electricity tax (*elafgift*)
-- Finds the cheapest upcoming hours and rolling time windows (2–3 hours)
-- Builds a decision-tree model (rpart) to predict price levels by day-of-week and hour
-- Models the 2026 consumer price for Copenhagen/Radius/Andel FlexEnergi, with all variable and fixed components documented in [PRICE_COMPONENTS.md](PRICE_COMPONENTS.md)
+Shared R modules prepare a validated snapshot once. Quarto pages, exploratory
+notebooks and notification previews consume that snapshot instead of fetching
+or calculating prices independently.
 
-## Project Structure
+Prices retain 15-minute resolution; hourly summaries come from the same data.
+Today's graph includes median and Q25–Q75 overlays for the preceding 30 completed
+Copenhagen dates. All prices are in DKK/kWh. The consumer-price scenario uses
+documented Andel FlexEnergi/Radius components; it does not describe every DK1
+customer. Fixed subscriptions remain separate.
 
+The heat map uses 1 °C bands and hours 07–23, with dark blue for lowest mean
+price and white for highest. Modeled hourly temperatures are joined to prices
+by exact UTC hour. This is decision support, not a measured COP curve.
+Coverage, source and generation time are displayed.
+
+Electricity comes from [Energi Data Service DayAheadPrices](https://api.energidataservice.dk/dataset/DayAheadPrices).
+Weather comes from the [Open-Meteo Historical Forecast API](https://open-meteo.com/en/docs/historical-forecast-api),
+with attribution. This personal, non-commercial project uses its free endpoint;
+publication no longer needs an OpenWeather secret.
+
+## Local development
+
+Use R 4.6.1, Quarto 1.10.19 and the packages in `renv.lock`. Restore the
+locked library explicitly, matching the container's batch execution:
+
+```bash
+export R_LIBS_USER="$PWD/.cache/r-library"
+bash scripts/environment-restore.sh "$R_LIBS_USER"
 ```
-├── index.Rmd            # Bookdown index / landing page
-├── EAST.Rmd             # Analysis for East Denmark (DK2)
-├── WEST.Rmd             # Analysis for West Denmark (DK1)
-├── _bookdown.yml        # Bookdown configuration
-├── EAST.ipynb            # 15-minute Jupyter analysis for DK2
-├── WEST.ipynb            # Adapted 15-minute Jupyter analysis for DK1
-├── renv.lock            # R package lockfile (renv)
-└── .github/workflows/   # CI/CD — build & deploy to GitHub Pages
+
+Interactive startup never installs packages. Missing packages cause an error
+instead of being downloaded during a render. Automation uses `Rscript --vanilla`.
+
+Prepare real data and render:
+
+```bash
+Rscript --vanilla scripts/prepare-data.R --output .cache/analysis.rds
+ELECTRICITY_DATA_FILE=.cache/analysis.rds quarto render
 ```
 
-## GitHub Actions and deployment
+Render deterministic offline fixtures without credentials:
 
-The repository uses three workflows:
+```bash
+Rscript --vanilla scripts/prepare-data.R --fixture --output .cache/fixture-analysis.rds
+ELECTRICITY_DATA_FILE=.cache/fixture-analysis.rds quarto render
+```
 
-- **Build and deploy electricity prices** renders the site in a prebuilt
-  R/Pandoc container and publishes it to GitHub Pages. It runs daily at 16:17
-  UTC, on relevant source changes to `master`, or manually through **Actions →
-  Run workflow**.
-- **Build R publication container** rebuilds the public GHCR image when the R
-  lockfile or container definition changes. This moves the slow package restore
-  out of every scheduled publication run.
-- **Security checks** scans the working tree and full Git history for common
-  credentials and validates the repository configuration on pushes and pull
-  requests.
+Preview a notification without sending:
 
-Set **Settings → Pages → Source** to **GitHub Actions**. The deployment uses
-standard runners and public GitHub Pages, so it requires no paid infrastructure
-or application secrets. The publication image is built from R 4.3.3, Pandoc, and
-`renv.lock`. Changing the lockfile starts the container workflow; wait for it
-to complete before running publication.
+```bash
+Rscript --vanilla scripts/send-pushover.R --dry-run --fixture
+```
 
-If a scheduled build fails, open the failed run under **Actions**, inspect the
-first error, correct it, and use **Run workflow**. A successful build must
-complete before Pages is updated.
+The explicit Quarto render list contains five pages. Jupyter notebooks are
+exploratory companions excluded from publication; see
+[notebook instructions](notebooks/README.md).
 
-## Setup
+## Deployment and morning delivery
 
-1. **Install R** (≥ 4.3) and [renv](https://rstudio.github.io/renv/).
-2. Clone the repo and restore packages:
+Pages publication and notification are independent workflows, both targeting
+**05:00 Europe/Copenhagen**. Prepared free external cron jobs retry at 05:15 and
+05:30; GitHub schedules provide later recovery. Early and completed invocations
+exit promptly without waiting for a clock time.
 
-   ```bash
-   git clone https://github.com/ckrusemd/danish-electricity-prices.git
-   cd danish-electricity-prices
-   ```
+See [scheduler setup](ops/README.md) and
+[workflow operations](.github/workflows/README.md). Scheduler templates are
+disabled until the external account and repository-scoped token are configured;
+committing a template does not activate scheduling.
 
-   In R:
+Notification state records an attempt before posting and saves confirmed
+Pushover acceptance. A lost response remains uncertain and is not automatically
+resent. Pushover acceptance confirms queuing, not that the phone displayed it.
+Notification and Pages state remain independent.
 
-   ```r
-   renv::restore()
-   ```
+Set **Settings → Pages → Source** to **GitHub Actions**. Public Pages and standard
+runners keep the intended setup free. Verified container images are selected by
+environment fingerprint and immutable digest. Packages are restored when the
+image is built, not during every publication. A failed build preserves the last
+successful site. Build metadata records source/environment identity, coverage
+and timings. The image includes hash-pinned PyYAML 6.0.3 for offline scheduler
+validation; CI also retains dependency build layers in the GitHub Actions cache.
 
-3. Render the book:
+## Repository map
 
-   ```r
-   bookdown::render_book("index.Rmd", output_dir = "_site")
+| Area | Purpose |
+|---|---|
+| `*.qmd`, `_quarto.yml`, `style.css` | Publication |
+| `R/` | Shared data, calculations and charts |
+| `EAST.ipynb`, `WEST.ipynb` | Exploratory notebooks |
+| `scripts/`, `tests/` | Preparation, preview and regression checks |
+| `.github/workflows/` | CI, environment, Pages and delivery |
+| `ops/` | External scheduler setup |
+| `renv.lock`, `Dockerfile` | Runtime |
 
-## Notebooks
-
-The repository contains one notebook per Danish bidding zone:
-
-- `EAST.ipynb` covers DK2 (East Denmark).
-- `WEST.ipynb` covers DK1 (West Denmark) and is adapted from the EAST analysis
-  so both notebooks use the same calculations and presentation.
-
-The notebooks are companion analyses; the Bookdown R Markdown files remain the
-authoritative GitHub Pages publication. Restore the `renv` environment before
-opening either notebook, and rerun the data cells when you need fresh prices.
-Notebook outputs are intentionally cleared from version control so the files do
-not present stale prices as current data.
-   ```
-
-## Data Source
-
-All electricity price data comes from the public [Energi Data Service DayAheadPrices API](https://api.energidataservice.dk/dataset/DayAheadPrices) — no API key required. The site normalizes the current 15-minute market data to hourly values for the legacy Bookdown charts. The site reports wholesale spot prices separately from any estimated consumer-price calculation because grid tariffs depend on the distribution network and can change over time.
-
-## License
-
-MIT
+Historical input caches accelerate repeat runs; current prices refresh on actual
+execution. Generated data, render output and previews stay out of version
+control. Keep credentials in GitHub secrets or the scheduler's protected
+settings, never in source or notebook outputs. See [SECURITY.md](SECURITY.md).

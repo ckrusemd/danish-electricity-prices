@@ -1,11 +1,11 @@
-.git
-.github
-_site
-renv/library
-renv/staging
-*.html
-*.pdf
-*.png
-*.jpg
-*.jpeg
-*.log
+# Environment images contain no project data, credentials, notebooks or assets.
+*
+!Dockerfile
+!.dockerignore
+!.Rprofile
+!renv.lock
+!renvinfra/
+!renvinfra/**
+!scripts/
+!scripts/environment-*.sh
+!scripts/verify-environment.R
