@@ -102,6 +102,8 @@ jobs:
         run: |
           started=$(date +%s)
           Rscript --vanilla scripts/prepare-data.R --output "$ELECTRICITY_DATA_FILE"
+          # Preserve R's $ operator; the shell must not expand this expression.
+          # shellcheck disable=SC2016
           Rscript --vanilla -e 'source("R/project.R"); x <- read_analysis(Sys.getenv("ELECTRICITY_DATA_FILE")); stopifnot(x$date == Sys.getenv("EXPECTED_DATE"))'
           echo "PREPARE_SECONDS=$(( $(date +%s) - started ))" >> "$GITHUB_ENV"
       - name: Render snapshot consumers
