@@ -9,6 +9,7 @@ Renviron.site
 .Renviron
 *.env
 *.env.*
+!renvinfra/versions.env
 *.pem
 *.key
 *.p12
@@ -30,6 +31,24 @@ _site/
 _bookdown_files/
 libs/
 
+# Quarto execution, prepared data and notification previews
+.quarto/
+_freeze/
+.cache/
+*_cache/
+*_files/
+notification-preview/
+notification-preview.png
+notification-data.rds
+__pycache__/
+pushover-result.json
+pushover-preview.txt
+pushover-preview.png
+build-manifest.json
+
 # OS files
 .DS_Store
 Thumbs.db
+
+/.quarto/
+**/*.quarto_ipynb

@@ -1,50 +1,69 @@
 # Workflow operations
 
-`deploy-pages.yml` renders `index.Rmd` in a prebuilt public GHCR container,
-uploads `_site` as a Pages artifact, and deploys it to the `github-pages`
-environment. It runs daily after 05:00 Europe/Copenhagen time, on relevant
-changes to `master`, and manually. Because GitHub cron uses UTC, it triggers
-at 04:00 and 05:00 UTC and selects the trigger matching the current
-CET/CEST daylight-saving offset. Its state is independent from notifications.
+Publication and notification run independently. Business dates and gates use
+`Europe/Copenhagen`, including DST. The external schedule targets 05:00 with
+recovery at 05:15 and 05:30. Native GitHub schedules provide later recovery but
+may be delayed or dropped. No runner waits for a future clock time.
 
-`daily-pushover.yml` sends the electricity summary. A persistent local systemd
-timer dispatches it at 05:05 Europe/Copenhagen and waits for confirmed Pushover
-acceptance. An hourly Actions watchdog catches up a missing delivery. The
-`electricity-notification-state` branch records the date, run ID and Pushover
-request ID to prevent duplicate delivery. UTC schedule candidates target
-05:05 in both CET and CEST, and the hourly watchdog recovers a delayed or
-skipped candidate. Early or already completed runs exit without waiting.
+## Publication
 
-`build-container.yml` rebuilds and publishes
-`ghcr.io/ckrusemd/danish-electricity-prices-r` when the Dockerfile or locked R
-environment changes. The image contains R 4.3.3, Pandoc, and the packages in
-`renv.lock`.
+`deploy-pages.yml` checks daily state before starting the R container.
+External dispatches use `scheduled_delivery=true` and the same daily gate as
+GitHub cron. Source pushes and ordinary manual publication can update the site
+during a day. Notebook-only changes validate without publishing.
 
-`security.yml` runs on pushes, pull requests, and manual dispatch. It scans all
-reachable Git history for common secret formats and checks required project files.
-R syntax is validated during the deployment build inside the container.
+`build-container.yml` resolves an environment fingerprint to a verified image.
+A missing environment is built and tested before publication uses it.
+R 4.6.1 and Quarto 1.10.19 are pinned; consumers use the resolved image digest.
+Persistent registry build caching avoids identical dependency restores.
 
-## Required settings
+Rendering prepares one snapshot, renders five Quarto pages, validates links
+and assets, then deploys `_site`. Metadata identifies source, environment,
+coverage and timings. The `electricity-pages-state` branch records successful
+daily publication. Failure leaves the last successful site available.
 
-1. Set **Pages → Source** to **GitHub Actions**.
-2. Keep the repository public for free standard Actions and Pages usage.
-3. After the first container publication, set the GHCR package visibility to
-   **Public** so Pages runners can pull it without credentials.
-4. Keep the default branch named `master`, or update workflow filters before
-   renaming it.
-5. Protect `master` with pull requests and required status checks before adding
-   collaborators.
+## Notification
 
-## Recovery and maintenance
+`daily-pushover.yml` has a lightweight admission gate and a delivery job.
+Early or accepted invocations use only the gate. Preparation excludes weather,
+so weather or Pages failures do not block notification.
 
-Run the deployment workflow manually after a failed or missed scheduled run.
-When `renv.lock` or the Dockerfile changes, let the container workflow finish
-before manually running the deployment workflow so `latest` has the matching
-environment.
-Do not add mail, Pushover, or other credentials to the workflow. If a credential
-is ever committed, revoke it immediately; deleting it later does not remove it
-from Git history.
+`electricity-notification-state` retains accepted deliveries and pending
+attempts. The sender makes one POST and records a valid success request ID.
+Ambiguous acceptance blocks automatic retransmission. Invalid or unreadable
+state is an error, not permission to send again. Legacy dates remain respected.
 
-Dependabot groups monthly GitHub Actions updates. Review those pull requests.
-Update the R environment with `renv`, commit the resulting `renv.lock`, and
-allow the container workflow to publish the new image before deploying.
+Use `Rscript --vanilla scripts/send-pushover.R --dry-run --fixture` to inspect text/graph
+without credentials or sends. Explicit forced unrecorded tests must not modify
+the ordinary daily lock. Real sends use `PUSHOVER_APP_TOKEN` and
+`PUSHOVER_USER_KEY` repository secrets.
+
+The optional local dispatcher performs bounded checks and at most one dispatch,
+then exits. Later invocations reconcile state. See
+[external scheduler setup](../../ops/README.md).
+
+## Validation and recovery
+
+CI uses offline fixtures for calculations, notification state, notebook
+execution and publication. Security scanning reports locations without printing
+credential values. Review dependency and action updates before merging.
+
+For a failed publication, correct its first error and run publication again.
+For uncertain notification delivery, inspect the originating run and recovery
+receipt. Confirmed acceptance should be recorded without resending. Unconfirmed
+attempts require review before an explicitly authorized resend; do not erase
+the state branch.
+
+Scheduler HTTP success confirms dispatch acceptance only. Verify workflow
+results and delivery state. After activation, inspect seven consecutive morning
+dates, then periodically check token expiry, scheduler activation and workflow
+health.
+
+## Settings
+
+- **Pages → Source:** GitHub Actions.
+- Keep the repository and verified GHCR image public.
+- Default branch: `master`; update filters if renamed.
+- Protect `master` with reviewed PRs and required CI/security checks.
+- External token: restricted to this repository, **Actions: write**.
+- Pushover keys stay in repository secrets; dispatch token stays in the scheduler.

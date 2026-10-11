@@ -12,31 +12,26 @@ permissions:
 jobs:
   secret-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Check out repository history
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - name: Scan repository and history for secrets
+          persist-credentials: false
+      - name: Scan working tree, notebooks, and history without printing values
         run: bash scripts/secret-scan.sh
       - name: Set up R for syntax checks
         uses: r-lib/actions/setup-r@465b7d8e732ca3921382b1674c59bada9cbf3399 # v2
         with:
           r-version: '4.6.1'
-      - name: Validate repository files
+      - name: Install YAML linter
+        run: python3 -m pip install PyYAML==6.0.3
+      - name: Parse all repository YAML and scripts
         run: |
-          test -f .github/workflows/deploy-pages.yml
-          test -f .github/workflows/daily-pushover.yml
-          test -f .github/workflows/build-container.yml
-          test -f Dockerfile
-          test -f .dockerignore
-          test -f .github/dependabot.yml
-          test -f renv.lock
-          test -f _bookdown.yml
           git diff --check
-      - name: Validate shared R source is present
+          python3 scripts/notification-lint.py
+      - name: Check notification admission, state, concurrency, recovery, and scanner offline
         run: |
-          test -s R/data.R
-          bash -n scripts/dispatch-daily-pushover.sh
-          Rscript --vanilla -e 'parse(file = "R/data.R"); parse(file = "scripts/send-pushover.R")'
+          python3 -m unittest discover -s tests/notifications -p 'test_*.py' -v
+          Rscript --vanilla tests/notifications/test-content.R

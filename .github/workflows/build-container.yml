@@ -1,6 +1,23 @@
-name: Build R publication container
+name: Build verified R publication environment
 
 on:
+  workflow_call:
+    outputs:
+      image:
+        description: Verified immutable image reference
+        value: ${{ jobs.environment.outputs.image }}
+      digest:
+        description: Registry manifest digest
+        value: ${{ jobs.environment.outputs.digest }}
+      environment_hash:
+        description: Hash of all environment inputs
+        value: ${{ jobs.environment.outputs.environment_hash }}
+      build_mode:
+        description: cold build or warm verified reuse
+        value: ${{ jobs.environment.outputs.build_mode }}
+      build_seconds:
+        description: Candidate build elapsed seconds (zero for warm reuse)
+        value: ${{ jobs.environment.outputs.build_seconds }}
   workflow_dispatch:
   push:
     branches: [master]
@@ -8,51 +25,138 @@ on:
       - Dockerfile
       - .dockerignore
       - renv.lock
-      - renv/settings.json
-      - renv/activate.R
+      - renvinfra/**
       - .Rprofile
+      - scripts/environment-*.sh
+      - scripts/verify-environment.R
       - .github/workflows/build-container.yml
 
 permissions:
   contents: read
-
-concurrency:
-  group: publication-container
-  cancel-in-progress: true
+  packages: write
 
 env:
   IMAGE_NAME: ghcr.io/ckrusemd/danish-electricity-prices-r
 
 jobs:
-  publish:
+  environment:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 45
+    concurrency:
+      group: publication-environment
+      cancel-in-progress: false
+    outputs:
+      image: ${{ steps.result.outputs.image }}
+      digest: ${{ steps.result.outputs.digest }}
+      environment_hash: ${{ steps.fingerprint.outputs.hash }}
+      build_mode: ${{ steps.resolve.outputs.mode }}
+      build_seconds: ${{ steps.build-time.outputs.seconds || '0' }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Restrict environment and cache publication to master
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/master ]]; then
+            echo '::error::Environment publication requires master; use offline CI to test other branches.'
+            exit 1
+          fi
+      - name: Fingerprint environment inputs
+        id: fingerprint
+        run: echo "hash=$(bash scripts/environment-fingerprint.sh)" >> "$GITHUB_OUTPUT"
+      - name: Resolve matching environment only
+        id: resolve
+        env:
+          HASH: ${{ steps.fingerprint.outputs.hash }}
+        shell: bash
+        run: |
+          tag="$IMAGE_NAME:env-$HASH"
+          if digest=$(bash scripts/environment-resolve.sh "$tag"); then
+            echo "mode=warm" >> "$GITHUB_OUTPUT"
+            echo "reference=$IMAGE_NAME@$digest" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            if [[ "$status" != 3 ]]; then
+              echo '::error::Registry lookup failed; refusing to treat network/authentication errors as a cache miss.'
+              exit "$status"
+            fi
+            echo "mode=cold" >> "$GITHUB_OUTPUT"
+            echo "reference=$IMAGE_NAME:candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        if: steps.resolve.outputs.mode == 'cold'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and publish image
-        uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.resolve.outputs.mode == 'cold'
+      - name: Start candidate build timer
+        id: build-start
+        if: steps.resolve.outputs.mode == 'cold'
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - name: Build local candidate before publishing
+        if: steps.resolve.outputs.mode == 'cold'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=gha,scope=publication-r
-          cache-to: type=gha,mode=max,scope=publication-r
-      - name: Smoke test published image
-        run: >-
-          docker run --rm
-          ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          Rscript --vanilla -e 'stopifnot(as.character(getRversion()) == "4.6.1", requireNamespace("bookdown", quietly = TRUE), requireNamespace("httr", quietly = TRUE))'
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.resolve.outputs.reference }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
+      - name: Measure candidate build time
+        id: build-time
+        if: steps.resolve.outputs.mode == 'cold'
+        env:
+          STARTED: ${{ steps.build-start.outputs.started }}
+        run: echo "seconds=$(( $(date +%s) - STARTED ))" >> "$GITHUB_OUTPUT"
+      - name: Verify candidate or reused image against current lock
+        env:
+          REFERENCE: ${{ steps.resolve.outputs.reference }}
+        run: |
+          docker run --rm --network none -v "$PWD:/project" -w /project "$REFERENCE" bash -euo pipefail -c '
+            Rscript --vanilla scripts/verify-environment.R --image
+            bash tests/deployment/test-environment.sh
+            Rscript --vanilla tests/deployment/test-environment.R
+          '
+      - name: Validate cold candidate with all five fixture pages before promotion
+        if: steps.resolve.outputs.mode == 'cold'
+        env:
+          REFERENCE: ${{ steps.resolve.outputs.reference }}
+        run: |
+          docker run --rm --network none -v "$PWD:/project" -w /project \
+            -e ELECTRICITY_FIXTURE=true -e ELECTRICITY_DATA_FILE=/tmp/environment-smoke.rds \
+            "$REFERENCE" bash -euo pipefail -c '
+              quarto check knitr
+              Rscript --vanilla scripts/prepare-data.R --fixture --output "$ELECTRICITY_DATA_FILE"
+              quarto render
+              Rscript --vanilla scripts/site-check.R --rendered
+            '
+      - name: Publish tested candidate and return digest
+        id: result
+        env:
+          HASH: ${{ steps.fingerprint.outputs.hash }}
+          MODE: ${{ steps.resolve.outputs.mode }}
+          REFERENCE: ${{ steps.resolve.outputs.reference }}
+          BUILD_SECONDS: ${{ steps.build-time.outputs.seconds || '0' }}
+        shell: bash
+        run: |
+          tag="$IMAGE_NAME:env-$HASH"
+          if [[ "$MODE" == cold ]]; then
+            docker tag "$REFERENCE" "$tag"
+            docker push "$tag"
+          fi
+          if [[ "$MODE" == warm ]]; then
+            digest=${REFERENCE##*@}
+          else
+            digest=$(bash scripts/environment-resolve.sh "$tag")
+          fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE_NAME@$digest" >> "$GITHUB_OUTPUT"
+          printf 'environment_hash=%s\nbuild_mode=%s\nbuild_seconds=%s\nimage=%s@%s\n' "$HASH" "$MODE" "$BUILD_SECONDS" "$IMAGE_NAME" "$digest" | tee environment-provenance.txt
+          printf '### Publication environment\n\n- Cold builds: %s\n- Warm reuses: %s\n- Environment: `%s`\n- Image: `%s@%s`\n' "$([[ "$MODE" == cold ]] && echo 1 || echo 0)" "$([[ "$MODE" == warm ]] && echo 1 || echo 0)" "$HASH" "$IMAGE_NAME" "$digest" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: environment-provenance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: environment-provenance.txt

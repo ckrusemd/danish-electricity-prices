@@ -12,6 +12,11 @@ plot_theme_console <- function() {
       legend.background = ggplot2::element_rect(fill = "#0d2325", colour = NA),
       legend.text = ggplot2::element_text(colour = "#a9bbb9"),
       legend.title = ggplot2::element_text(colour = "#9af2df", face = "bold"),
+      legend.position = "bottom",
+      legend.box = "vertical",
+      strip.background = ggplot2::element_rect(fill = "#123033", colour = NA),
+      strip.text = ggplot2::element_text(colour = "#eef6f5", face = "bold"),
+      plot.caption = ggplot2::element_text(colour = "#a9bbb9", hjust = 0, size = 9),
       plot.margin = ggplot2::margin(12, 14, 10, 12)
     )
 }
@@ -22,5 +27,7 @@ plot_theme_print <- function() {
 }
 
 plot_theme <- function() {
-  if (knitr::is_html_output()) plot_theme_console() else plot_theme_print()
+  if (!requireNamespace("knitr", quietly = TRUE) ||
+      is.null(knitr::opts_knit$get("rmarkdown.pandoc.to")) ||
+      knitr::is_html_output()) plot_theme_console() else plot_theme_print()
 }

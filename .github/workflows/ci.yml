@@ -1,0 +1,79 @@
+name: Offline publication CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publication-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate all workflows with pinned actionlint
+        shell: bash
+        run: |
+          lint_dir=$(mktemp -d)
+          curl --fail --location --retry 3 --output "$lint_dir/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$lint_dir/actionlint.tar.gz" | sha256sum --check --status
+          tar -xzf "$lint_dir/actionlint.tar.gz" -C "$lint_dir" actionlint
+          "$lint_dir/actionlint"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Start local build timer
+        run: echo "BUILD_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Build test image locally (including fork pull requests)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: electricity-ci:local
+          cache-from: type=registry,ref=ghcr.io/ckrusemd/danish-electricity-prices-r:buildcache
+      - name: Fixture data, tests, notebook Run All, render and notification dry-run
+        run: |
+          mkdir -p .cache
+          build_seconds=$(( $(date +%s) - BUILD_STARTED ))
+          docker run --rm --network none -v "$PWD:/project" -w /project \
+            -e ELECTRICITY_FIXTURE=true -e ELECTRICITY_DATA_FILE=/project/.cache/analysis.rds \
+            -e NOTIFICATION_PREVIEW_FILE=/project/.cache/notification-preview.png \
+            -e BUILD_SECONDS="$build_seconds" \
+            -e BUILD_MODE=cold -e GITHUB_SHA -e GITHUB_RUN_ID electricity-ci:local \
+            bash -euo pipefail -c '
+              Rscript --vanilla scripts/verify-environment.R --image
+              bash tests/deployment/test-environment.sh
+              started=$SECONDS
+              Rscript --vanilla scripts/prepare-data.R --fixture --output "$ELECTRICITY_DATA_FILE"
+              export PREPARE_SECONDS=$(( SECONDS - started ))
+              while IFS= read -r -d "" test_file; do Rscript --vanilla "$test_file"; done < <(find tests -type f -name "test*.R" -print0 | sort -z)
+              while IFS= read -r -d "" test_file; do python3 "$test_file"; done < <(find tests -type f -name "test*.py" -print0 | sort -z)
+              Rscript --vanilla scripts/check-notebooks.R
+              started=$SECONDS
+              quarto render
+              export RENDER_SECONDS=$(( SECONDS - started ))
+              Rscript --vanilla scripts/site-check.R --rendered
+              Rscript --vanilla scripts/send-pushover.R --dry-run
+              Rscript --vanilla renvinfra/provenance.R "$ELECTRICITY_DATA_FILE" .cache/ci-provenance.json
+            '
+      - name: Upload offline evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: offline-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            _site
+            .cache/ci-provenance.json
+            .cache/notification-preview.png
+          if-no-files-found: warn

@@ -1,0 +1,41 @@
+{
+  "job": {
+    "title": "Electricity morning notification",
+    "enabled": false,
+    "saveResponses": false,
+    "url": "https://api.github.com/repos/ckrusemd/danish-electricity-prices/actions/workflows/daily-pushover.yml/dispatches",
+    "requestMethod": 1,
+    "requestTimeout": 30,
+    "redirectSuccess": false,
+    "schedule": {
+      "timezone": "Europe/Copenhagen",
+      "expiresAt": 0,
+      "hours": [
+        5
+      ],
+      "minutes": [
+        0,
+        15,
+        30
+      ],
+      "mdays": [
+        -1
+      ],
+      "months": [
+        -1
+      ],
+      "wdays": [
+        -1
+      ]
+    },
+    "extendedData": {
+      "headers": {
+        "Authorization": "Bearer <REPOSITORY_ACTIONS_WRITE_PAT>",
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2026-03-10"
+      },
+      "body": "{\"ref\":\"master\",\"inputs\":{\"scheduled_delivery\":\"true\",\"delivery_slot\":\"morning\",\"trigger_source\":\"external\",\"dispatch_id\":\"cron-job-morning\"}}"
+    }
+  }
+}

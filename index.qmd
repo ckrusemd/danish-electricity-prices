@@ -1,0 +1,71 @@
+---
+title: "Danish Electricity Prices"
+toc: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+source("R/project.R")
+source("scripts/site-helpers.R")
+snapshot <- site_read_snapshot()
+```
+
+::: {.publication-hero}
+::: {.eyebrow}
+Danish energy market monitor
+:::
+
+## Find the best hours to use electricity
+
+Quarter-hour spot prices, the cheapest published windows, and a comparison with
+the previous 30 completed days. Choose your bidding zone to plan flexible use.
+
+```{r}
+#| results: asis
+cat('<div class="publication-actions">')
+for (zone in c("DK2", "DK1")) {
+  east <- zone == "DK2"
+  cat('<a class="zone-card ', if (east) 'zone-card-east' else 'zone-card-west',
+      '" href="', if (east) 'east-denmark.html' else 'west-denmark.html', '">',
+      '<span class="zone-card-label">', zone, '</span>',
+      '<span class="zone-card-title">', if (east) 'East Denmark' else 'West Denmark', '</span>',
+      '<span class="zone-card-summary">', site_escape(site_window_hero(snapshot, zone)), '</span>',
+      '<span class="zone-card-action">View prices →</span></a>', sep = "")
+}
+cat('</div>')
+```
+:::
+
+## Data coverage and timing
+
+```{r}
+#| results: asis
+site_metadata(snapshot)
+```
+
+Times on charts and tables are **Europe/Copenhagen**, including CET/CEST.
+The snapshot generation time above is UTC. Prices beyond today are shown only
+when published by the market provider. Missing or incomplete coverage is
+reported in the coverage details; a missing recommendation means that no
+complete eligible window was available.
+
+## Read the right price
+
+**Wholesale spot** is the bidding-zone market price before VAT and consumer
+charges. The recommended windows and period averages use this wholesale basis.
+Negative spot prices are retained on charts and in tables.
+
+**Radius / Andel consumer scenario** is an hourly estimate for a private customer
+in Radius' area with Andel FlexEnergi, including VAT and variable charges.
+It excludes fixed subscriptions. It is shown separately on the
+[East Denmark page](east-denmark.qmd); actual bills depend on the agreement.
+DK1 wholesale prices are not a generic western-Denmark consumer tariff.
+
+See [price components](price-components.qmd) for the scenario and
+[temperature and electricity prices](heatpump.qmd) for weather context.
+
+::: {.publication-note}
+Use the timestamped tables to schedule a load. The lowest wholesale window can
+differ from the lowest consumer-cost window because network charges vary by hour.
+:::

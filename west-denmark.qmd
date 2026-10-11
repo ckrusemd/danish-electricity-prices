@@ -1,0 +1,103 @@
+---
+title: "West Denmark · DK1"
+---
+
+```{r}
+#| label: setup
+#| include: false
+source("R/project.R")
+source("R/plots.R")
+source("scripts/site-helpers.R")
+snapshot <- site_read_snapshot()
+zone <- "DK1"
+summary <- snapshot$summaries[[zone]]
+```
+
+::: {.publication-hero .zone-hero}
+::: {.eyebrow}
+West Denmark · DK1
+:::
+
+## Find a lower wholesale-price window
+
+```{r}
+#| results: asis
+cat('<p class="lead">', site_escape(site_window_hero(snapshot, zone)), '</p>', sep = "")
+```
+
+These are wholesale prices before VAT, grid charges, tax and supplier add-ons.
+Your consumer cost depends on your local grid operator and electricity agreement.
+:::
+
+```{r}
+#| results: asis
+site_metadata(snapshot, zone)
+```
+
+## Today's quarter-hour prices
+
+```{r}
+#| label: daily-prices
+#| fig-alt: "DK1 quarter-hour wholesale prices, with the historical median and Q25 to Q75 band for the previous 30 completed days."
+plot_daily_prices(snapshot, zone)
+```
+
+The snapshot's reference profile uses the previous **30 completed Copenhagen
+days**, excluding today. The dashed line is the median and the band is Q25–Q75
+at each local clock time. Read the coverage details for incomplete history.
+
+## Cheapest published window
+
+```{r}
+#| results: asis
+site_windows(summary$upcoming_window, "DK1 · cheapest complete upcoming wholesale window")
+```
+
+The start is inclusive and the end exclusive. Cost assumes a constant 1 kW load
+throughout the window, before all consumer charges.
+
+## Today's hourly prices
+
+```{r}
+#| results: asis
+site_today(snapshot, zone)
+```
+
+Hourly values come from the shared analysis of quarter-hour prices. CET/CEST
+labels distinguish repeated clock hours when daylight saving time ends.
+
+## Recent and published prices
+
+```{r}
+#| label: hourly-overview
+#| fig-alt: "DK1 hourly wholesale spot prices over the last seven days and all published future hours, including negative prices."
+plot_hourly_overview(snapshot, zone)
+```
+
+## Period averages
+
+```{r}
+#| results: asis
+periods <- summary$period_averages
+names(periods) <- c("Period", "Wholesale average (DKK/kWh)")
+site_table(periods, "DK1 · wholesale period averages")
+```
+
+## Cheapest historical window
+
+This is the cheapest complete eligible wholesale window retained by the shared
+analysis over its **six-month history**. It describes the past, not a future offer.
+
+```{r}
+#| results: asis
+site_windows(summary$historical_window, "DK1 · six-month historical cheapest wholesale window")
+```
+
+## Quarter-hour values
+
+```{r}
+#| results: asis
+quarters <- summary$quarter_today[, c("TimeUTC", "SpotPriceDKK"), drop = FALSE]
+names(quarters) <- c("Interval start (Copenhagen)", "Wholesale spot (DKK/kWh)")
+site_table(quarters, "DK1 · today's published quarter-hour values")
+```
