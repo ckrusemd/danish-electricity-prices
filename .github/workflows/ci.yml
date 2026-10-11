@@ -41,7 +41,10 @@ jobs:
           load: true
           push: false
           tags: electricity-ci:local
-          cache-from: type=registry,ref=ghcr.io/ckrusemd/danish-electricity-prices-r:buildcache
+          cache-from: |
+            type=gha,scope=electricity-publication-ci
+            type=registry,ref=ghcr.io/ckrusemd/danish-electricity-prices-r:buildcache
+          cache-to: type=gha,scope=electricity-publication-ci,mode=max
       - name: Fixture data, tests, notebook Run All, render and notification dry-run
         run: |
           mkdir -p .cache

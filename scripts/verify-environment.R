@@ -12,6 +12,8 @@ for (record in lock$Packages) {
 pins <- readLines("renvinfra/versions.env")
 version <- sub("^QUARTO_VERSION=", "", grep("^QUARTO_VERSION=", pins, value = TRUE))
 stopifnot(identical(system2("quarto", "--version", stdout = TRUE), version))
+python_status <- system2("python3", c("-c", shQuote('import yaml; assert yaml.__version__ == "6.0.3"')))
+stopifnot(identical(python_status, 0L))
 manifest <- "/opt/electricity/environment.sha256"
 if ("--image" %in% args && !file.exists(manifest)) stop("Image has no verified environment fingerprint; rebuild with build-container")
 if (file.exists(manifest)) {

@@ -21,7 +21,7 @@ RUN apt-get update \
         libuv1-dev \
         libxml2-dev \
         pkg-config \
-        ca-certificates curl git python3 \
+        ca-certificates curl git python3 python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /environment
@@ -29,6 +29,11 @@ WORKDIR /environment
 COPY Dockerfile .dockerignore .Rprofile renv.lock ./
 COPY renvinfra/ renvinfra/
 COPY scripts/environment-*.sh scripts/verify-environment.R scripts/
+
+RUN python3 -m venv /opt/electricity/python \
+    && /opt/electricity/python/bin/pip install --no-cache-dir --require-hashes \
+        -r renvinfra/python-requirements.txt
+ENV PATH=/opt/electricity/python/bin:$PATH
 
 RUN bash scripts/environment-install-quarto.sh /opt/quarto \
     && bash scripts/environment-restore.sh /opt/electricity/library

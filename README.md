@@ -86,7 +86,8 @@ runners keep the intended setup free. Verified container images are selected by
 environment fingerprint and immutable digest. Packages are restored when the
 image is built, not during every publication. A failed build preserves the last
 successful site. Build metadata records source/environment identity, coverage
-and timings.
+and timings. The image includes hash-pinned PyYAML 6.0.3 for offline scheduler
+validation; CI also retains dependency build layers in the GitHub Actions cache.
 
 ## Repository map
 
