@@ -101,7 +101,9 @@ validation; CI also retains dependency build layers in the GitHub Actions cache.
 | `ops/` | External scheduler setup |
 | `renv.lock`, `Dockerfile` | Runtime |
 
-Historical input caches accelerate repeat runs; current prices refresh on actual
-execution. Generated data, render output and previews stay out of version
+Historical input caches accelerate repeat runs; one bounded price request covers
+both zones, new historical quarters and fresh current prices on each actual
+execution. Long API Retry-After delays stop the run immediately for later
+scheduled recovery, without holding a runner open. Generated data, render output and previews stay out of version
 control. Keep credentials in GitHub secrets or the scheduler's protected
 settings, never in source or notebook outputs. See [SECURITY.md](SECURITY.md).

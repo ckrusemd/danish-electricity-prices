@@ -108,13 +108,7 @@ prepare_analysis <- function(now = Sys.time(), fixture = FALSE, include_weather 
   if (fixture) {
     quarters <- fixture_quarter_prices(history_start, current_end)
   } else {
-    quarters <- do.call(rbind, lapply(c("DK1", "DK2"), function(zone) {
-      historical <- load_historical_prices(zone, history_start, today_start, cache_dir)
-      # Current and published next-day inputs always refresh, never from disk cache.
-      current <- fetch_quarter_hour_prices(zone, start = today_start, end = current_end,
-        require_future = FALSE, now = now)
-      rbind(historical, current)
-    }))
+    quarters <- load_price_inputs(history_start, today_start, current_end, cache_dir)
   }
   quarters <- quarters[order(quarters$PriceArea, quarters$TimeUTC), , drop = FALSE]
   rownames(quarters) <- NULL
