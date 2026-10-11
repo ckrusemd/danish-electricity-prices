@@ -18,6 +18,7 @@ RUN apt-get update \
         libharfbuzz-dev \
         libfribidi-dev \
         libssl-dev \
+        libuv1-dev \
         libxml2-dev \
         pkg-config \
         ca-certificates curl git python3 \
