@@ -1,11 +1,1 @@
-{
-  "schema_version": 1,
-  "deliveries": {
-    "morning": {
-      "date": "2026-10-11",
-      "sent_at": "2026-10-11T08:17:36+02:00",
-      "run_id": "38117528559",
-      "pushover_request_id": "2c454aa5-6482-4180-adbe-8e37a460cce8"
-    }
-  }
-}
+{"attempts": {"38241728068-1": {"artifact_name": "notification-receipt-38241728068-1", "date": "2026-10-12", "run_id": "38241728068", "slot": "morning", "status": "pending"}}, "deliveries": {"morning": {"date": "2026-10-11", "pushover_request_id": "2c454aa5-6482-4180-adbe-8e37a460cce8", "run_id": "38117528559", "sent_at": "2026-10-11T08:17:36+02:00"}}, "schema_version": 2}
