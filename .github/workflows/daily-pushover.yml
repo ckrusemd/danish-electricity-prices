@@ -32,7 +32,12 @@ on:
         default: manual
         type: string
   schedule:
-    - cron: "37 5-23 * * *"
+    # Independent attempts: no active runner waits between these invocations.
+    - cron: "0,17,37 5 * * *"
+      timezone: Europe/Copenhagen
+    - cron: "17,37 6-8 * * *"
+      timezone: Europe/Copenhagen
+    - cron: "37 9-23 * * *"
       timezone: Europe/Copenhagen
 
 permissions:
@@ -77,8 +82,13 @@ jobs:
           GATE_OUTCOME: ${{ steps.gate.outcome }}
           IMAGE_OUTCOME: ${{ steps.image.outcome }}
           GATE_ACTION: ${{ steps.gate.outputs.action }}
+          GATE_REASON: ${{ steps.gate.outputs.reason }}
+          GATE_DATE: ${{ steps.gate.outputs.date }}
         run: |
-          echo "Notification gate: action=$GATE_ACTION gate=$GATE_OUTCOME environment=$IMAGE_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          echo "Notification gate: action=$GATE_ACTION reason=$GATE_REASON date=$GATE_DATE gate=$GATE_OUTCOME environment=$IMAGE_OUTCOME" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$GATE_ACTION" = skip ]; then
+            echo "Skipped: this successful gate did not send a notification." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
           test "$GATE_OUTCOME" = success
           if [ "$GATE_ACTION" != skip ]; then test "$IMAGE_OUTCOME" = success; fi
 
