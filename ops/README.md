@@ -5,8 +5,11 @@ only. Nothing in this directory activates a service or sends a notification.
 Each template dispatches its own workflow at **05:00, 05:15, and 05:30 in
 Europe/Copenhagen**, including daylight saving time. The 05:15 and 05:30 calls
 are later admission/recovery opportunities; they are not Pushover POST retries.
-Native Actions schedules provide recovery at minute 37 in hours 05–23 in the
-same timezone. An early or already delivered notification exits after one
+Native Actions schedules attempt 05:00, 05:17 and 05:37, then minutes 17/37
+in hours 06–08 and minute 37 in hours 09–23 in the same timezone. These are
+independent invocations, not a runner waiting or polling. GitHub can delay or
+drop them; more cron entries do not guarantee timely morning delivery. An early
+or already delivered notification exits after one
 lightweight gate job. An eligible notification uses only gate and delivery jobs.
 
 After integration and reviewing rollout, use cron-job.org's free

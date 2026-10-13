@@ -29,7 +29,12 @@ on:
       - .github/workflows/build-container.yml
       - .github/workflows/deploy-pages.yml
   schedule:
-    - cron: '37 5-23 * * *'
+    # Independent attempts: no active runner waits between these invocations.
+    - cron: '0,17,37 5 * * *'
+      timezone: Europe/Copenhagen
+    - cron: '17,37 6-8 * * *'
+      timezone: Europe/Copenhagen
+    - cron: '37 9-23 * * *'
       timezone: Europe/Copenhagen
 
 permissions:
@@ -64,7 +69,17 @@ jobs:
             [[ "$last_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
           fi
           bash scripts/environment-pages-gate.sh "$last_date" | tee -a "$GITHUB_OUTPUT"
+          echo "last_deployment_date=$last_date" >> "$GITHUB_STEP_SUMMARY"
           echo "trigger_source=$TRIGGER_SOURCE" >> "$GITHUB_STEP_SUMMARY"
+      - name: Report whether publication was admitted
+        env:
+          ADMITTED: ${{ steps.gate.outputs.deploy }}
+          BUSINESS_DATE: ${{ steps.gate.outputs.date }}
+        run: |
+          echo "Pages gate: admitted=$ADMITTED date=$BUSINESS_DATE local_time=$(TZ=Europe/Copenhagen date --iso-8601=seconds)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ADMITTED" = false ]; then
+            echo "Skipped: this successful gate did not publish a new site." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   environment:
     needs: schedule-gate

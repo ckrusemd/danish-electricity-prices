@@ -53,8 +53,19 @@ class AutomationTests(unittest.TestCase):
         workflow = yaml.safe_load((ROOT / ".github/workflows/daily-pushover.yml").read_text())
         self.assertEqual(set(workflow["jobs"]), {"gate", "delivery"})
         self.assertFalse(workflow["concurrency"]["cancel-in-progress"])
-        on = workflow.get("on", workflow.get(True))
-        self.assertEqual(on["schedule"], [{"cron": "37 5-23 * * *", "timezone": "Europe/Copenhagen"}])
+        expected_schedule = [
+            {"cron": "0,17,37 5 * * *", "timezone": "Europe/Copenhagen"},
+            {"cron": "17,37 6-8 * * *", "timezone": "Europe/Copenhagen"},
+            {"cron": "37 9-23 * * *", "timezone": "Europe/Copenhagen"},
+        ]
+        for filename in ("daily-pushover.yml", "deploy-pages.yml"):
+            definition = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+            on = definition.get("on", definition.get(True))
+            self.assertEqual(on["schedule"], expected_schedule)
+            runs = "\n".join(step.get("run", "") for job in definition["jobs"].values()
+                             for step in job.get("steps", []))
+            self.assertNotRegex(runs, r"\bsleep\b|\bwait_seconds\b|\btarget_epoch\b")
+            self.assertIn("Skipped: this successful gate did not", runs)
         self.assertNotIn("latest", workflow["jobs"]["delivery"]["container"]["image"])
         steps = workflow["jobs"]["delivery"]["steps"]
         artifact = next(step for step in steps if step.get("uses", "").startswith("actions/upload-artifact@"))

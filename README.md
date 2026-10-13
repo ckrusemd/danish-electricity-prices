@@ -68,7 +68,8 @@ exploratory companions excluded from publication; see
 
 Pages publication and notification are independent workflows, both targeting
 **05:00 Europe/Copenhagen**. Prepared free external cron jobs retry at 05:15 and
-05:30; GitHub schedules provide later recovery. Early and completed invocations
+05:30; native GitHub schedules attempt 05:00, 05:17 and 05:37, with further
+morning and hourly recovery. GitHub may delay or drop scheduled runs. Early and completed invocations
 exit promptly without waiting for a clock time.
 
 See [scheduler setup](ops/README.md) and

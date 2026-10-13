@@ -2,8 +2,10 @@
 
 Publication and notification run independently. Business dates and gates use
 `Europe/Copenhagen`, including DST. The external schedule targets 05:00 with
-recovery at 05:15 and 05:30. Native GitHub schedules provide later recovery but
-may be delayed or dropped. No runner waits for a future clock time.
+recovery at 05:15 and 05:30. Native GitHub schedules attempt 05:00, 05:17 and
+05:37, minutes 17/37 in hours 06–08, then minute 37 in hours 09–23. They may
+still be delayed or dropped; only activating the external scheduler adds an
+independent timing source. No runner waits for a future clock time.
 
 ## Publication
 
@@ -27,6 +29,10 @@ daily publication. Failure leaves the last successful site available.
 `daily-pushover.yml` has a lightweight admission gate and a delivery job.
 Early or accepted invocations use only the gate. Preparation excludes weather,
 so weather or Pages failures do not block notification.
+
+A green workflow with skipped downstream jobs does not prove publication or
+delivery. Gate summaries explicitly report admission/skip and the business
+date. Check the actual deploy/send job, public snapshot date, and state journal.
 
 `electricity-notification-state` retains accepted deliveries and pending
 attempts. The sender makes one POST and records a valid success request ID.
