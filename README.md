@@ -1,6 +1,6 @@
 # Danish Electricity Prices
 
-A daily Quarto website for DK1 (West) and DK2 (East), with Pushover notifications
+A daily Quarto website for East Denmark (DK2), with Pushover notifications
 and a heat-pump price/temperature heat map.
 
 [Open the publication](https://ckrusemd.github.io/danish-electricity-prices/).
@@ -60,7 +60,7 @@ Preview a notification without sending:
 Rscript --vanilla scripts/send-pushover.R --dry-run --fixture
 ```
 
-The explicit Quarto render list contains five pages. Jupyter notebooks are
+The explicit Quarto render list contains four pages. Jupyter notebooks are
 exploratory companions excluded from publication; see
 [notebook instructions](notebooks/README.md).
 
@@ -108,3 +108,6 @@ execution. Long API Retry-After delays stop the run immediately for later
 scheduled recovery, without holding a runner open. Generated data, render output and previews stay out of version
 control. Keep credentials in GitHub secrets or the scheduler's protected
 settings, never in source or notebook outputs. See [SECURITY.md](SECURITY.md).
+
+Publication and notifications focus on DK2. Shared analysis and legacy exploratory
+notebooks retain both zones; former West publication links redirect to East Denmark.

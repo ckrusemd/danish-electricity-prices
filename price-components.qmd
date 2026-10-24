@@ -29,7 +29,7 @@ site_metadata(snapshot, "DK2")
 
 ## Wholesale and consumer prices
 
-The **wholesale spot price** is the market price for DK1 or DK2 in DKK/kWh,
+The **wholesale spot price** is the market price for East Denmark (DK2) in DKK/kWh,
 before VAT and retail charges. Quarter-hour charts, historical profiles,
 period averages and cheapest-window recommendations all use this basis.
 
@@ -72,7 +72,7 @@ site_table(sample, "DK2 · one hourly example from the prepared snapshot")
 ## Scope and sources
 
 This scenario is specific to Radius / Andel and is not a universal Danish or
-DK1 consumer price. Supplier contracts, fixed fees, own generation, exemptions
+regional consumer price. Supplier contracts, fixed fees, own generation, exemptions
 and installation-specific charges can alter an actual bill. Rates can change;
 the scenario metadata above records what the snapshot used.
 

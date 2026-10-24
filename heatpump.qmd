@@ -24,10 +24,10 @@ into context. Use the published zone prices when planning today's operation.
 
 ```{r}
 #| results: asis
-site_metadata(snapshot)
+site_metadata(snapshot, "DK2")
 if (is.null(snapshot$weather) || !nrow(snapshot$heatmap)) {
   cat('<p class="publication-note">Weather analysis is unavailable in this snapshot. ',
-      'Use the East or West price page for electricity scheduling; a weather-inclusive ',
+      'Use the East Denmark price page for electricity scheduling; a weather-inclusive ',
       'snapshot is needed for the heatmap.</p>')
 }
 ```
@@ -36,9 +36,9 @@ if (is.null(snapshot$weather) || !nrow(snapshot$heatmap)) {
 
 ```{r}
 #| label: weather-price-heatmap
-#| fig-height: 9
-#| fig-alt: "Hourly temperature-band heatmaps for DK1 and DK2. Dark blue indicates the lowest observed mean consumer scenario price and white the highest."
-plot_heatmap(snapshot)
+#| fig-height: 6
+#| fig-alt: "Hourly temperature-band heatmap for East Denmark (DK2). Dark blue indicates the lowest observed mean consumer scenario price and white the highest."
+plot_heatmap(snapshot, "DK2")
 ```
 
 Each tile is the snapshot's average consumer-scenario price for a one-degree
@@ -51,15 +51,13 @@ joined by UTC timestamps. Check **provider** and **weather coverage** above for
 the actual source, gaps and scenario. Weather from a historical model or
 reanalysis describes modeled outdoor conditions, not a measurement at your house.
 
-The **Radius / Andel scenario** is applied to both zones for comparison. DK1
-cells are an illustrative use of those charges with DK1 spot prices; they do
-not represent a western-Denmark customer's local grid tariff.
+The **Radius / Andel scenario** uses East Denmark (DK2) spot prices.
 
 ## Matched observations
 
 ```{r}
 #| results: asis
-cells <- snapshot$heatmap
+cells <- snapshot$heatmap[snapshot$heatmap$PriceArea == "DK2", , drop = FALSE]
 if (nrow(cells)) cells <- cells[order(cells$PriceArea, cells$ConsumerPriceDKK), , drop = FALSE]
 site_table(cells, "Temperature bands, hours, mean scenario prices and observation counts",
            "No weather / price observations were included in this snapshot.")
@@ -73,5 +71,4 @@ on flow temperature, defrosting, building demand, controls and the installed
 heat pump. Outdoor temperature alone cannot establish a cheapest heat-output hour.
 
 Preserve comfort, hot-water requirements and your system's operating limits
-when shifting use. The [DK2](east-denmark.qmd) and [DK1](west-denmark.qmd) pages
-show the currently published wholesale windows.
+when shifting use. The [East Denmark page](east-denmark.qmd) shows the currently published wholesale windows.

@@ -119,7 +119,7 @@ jobs:
             bash tests/deployment/test-environment.sh
             Rscript --vanilla tests/deployment/test-environment.R
           '
-      - name: Validate cold candidate with all five fixture pages before promotion
+      - name: Validate cold candidate with all four fixture pages before promotion
         if: steps.resolve.outputs.mode == 'cold'
         env:
           REFERENCE: ${{ steps.resolve.outputs.reference }}

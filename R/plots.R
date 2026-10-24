@@ -91,7 +91,7 @@ plot_hourly_overview <- function(snapshot, zone) {
     plot_theme()
 }
 
-plot_heatmap <- function(snapshot, zone = NULL) {
+plot_heatmap <- function(snapshot, zone = "DK2") {
   cells <- snapshot$heatmap
   if (!is.null(zone)) {
     plot_zone(snapshot, zone)
@@ -106,7 +106,7 @@ plot_heatmap <- function(snapshot, zone = NULL) {
     ggplot2::scale_y_continuous(breaks = 7:23, limits = c(6.5, 23.5), expand = c(0, 0)) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(add = 0.5)) +
     ggplot2::labs(title = "Temperature and hourly consumer-price scenario",
-                   subtitle = "Radius / Andel charges applied to each zone's spot prices",
+                   subtitle = "Radius / Andel consumer scenario",
                    x = "Outdoor temperature band (°C)", y = "Copenhagen clock hour",
                    caption = "Dark blue = lowest mean price; white = highest. Missing cells have no observations.") +
     plot_theme()

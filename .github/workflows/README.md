@@ -19,7 +19,7 @@ A missing environment is built and tested before publication uses it.
 R 4.6.1 and Quarto 1.10.19 are pinned; consumers use the resolved image digest.
 Persistent registry build caching avoids identical dependency restores.
 
-Rendering prepares one snapshot, renders five Quarto pages, validates links
+Rendering prepares one snapshot, renders four Quarto pages, validates links
 and assets, then deploys `_site`. Metadata identifies source, environment,
 coverage and timings. The `electricity-pages-state` branch records successful
 daily publication. Failure leaves the last successful site available.

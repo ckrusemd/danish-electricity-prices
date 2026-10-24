@@ -12,7 +12,7 @@ fixture <- function(day = "2026-10-11") {
   attr(utc, "tzone") <- "UTC"
   local <- utc
   attr(local, "tzone") <- "Europe/Copenhagen"
-  quarter <- data.frame(TimeUTC = utc, TimeDK = local, PriceArea = "DK1", SpotPriceDKK = sin(seq_along(utc)/10) / 3)
+  quarter <- data.frame(TimeUTC = utc, TimeDK = local, PriceArea = "DK2", SpotPriceDKK = sin(seq_along(utc)/10) / 3)
   profile <- expand.grid(minute = c(0L, 15L, 30L, 45L), hour = 0:23)
   profile$q25 <- -0.1
   profile$median <- 0.1
@@ -28,21 +28,31 @@ fixture <- function(day = "2026-10-11") {
 }
 snapshot <- fixture()
 body <- notification_body(snapshot)
+stopifnot(!grepl("DK1|West|;", body), grepl("East Denmark (DK2)", body, fixed = TRUE),
+          grepl("00-06: -0.10\n06-09: 0.20", body, fixed = TRUE))
+# DK1 must never affect the notification or attachment.
+snapshot$summaries$DK1 <- NULL
+snapshot$meta$coverage$prices$DK1 <- NULL
+stopifnot(identical(body, notification_body(snapshot)))
 stopifnot(nchar(body) <= 1024L, grepl("0.30 DKK/kWh above", body, fixed = TRUE),
           all(vapply(c("00-06", "06-09", "09-17", "17-21", "21-24", "6-month low"), grepl, logical(1), x = body, fixed = TRUE)))
-snapshot$summaries$DK1$upcoming_window <- snapshot$summaries$DK1$upcoming_window[FALSE, ]
-stopifnot(grepl("unavailable", notification_body(snapshot)))
+snapshot$summaries$DK2$upcoming_window <- snapshot$summaries$DK2$upcoming_window[FALSE, ]
+stopifnot(grepl("Unavailable", notification_body(snapshot)))
 snapshot <- fixture()
-snapshot$meta$coverage$prices$DK1$upcoming$complete <- FALSE
+snapshot$meta$coverage$prices$DK2$upcoming$complete <- FALSE
 snapshot$meta$coverage$prices$DK2$history$complete <- FALSE
-stopifnot(grepl("Best published 3h (provisional)", notification_body(snapshot), fixed = TRUE),
-          grepl("unavailable (incomplete history)", notification_body(snapshot), fixed = TRUE),
+stopifnot(grepl("Best published 3 hours (provisional)", notification_body(snapshot), fixed = TRUE),
+          grepl("Incomplete history", notification_body(snapshot), fixed = TRUE),
           grepl("11/10", notification_body(snapshot), fixed = TRUE))
+partial <- fixture()
+partial$summaries$DK2$period_averages$average[1] <- NA_real_
+stopifnot(grepl("00-06: Unavailable", notification_body(partial), fixed = TRUE))
 for (day in c("2026-03-29", "2026-10-25", "2026-10-11")) {
   snapshot <- fixture(day)
   expected <- c("2026-03-29" = 92L, "2026-10-25" = 100L, "2026-10-11" = 96L)[[day]]
-  stopifnot(nrow(snapshot$summaries$DK1$quarter_today) == expected,
-            all(diff(as.numeric(snapshot$summaries$DK1$quarter_today$TimeUTC)) == 900))
+  stopifnot(nrow(snapshot$summaries$DK2$quarter_today) == expected,
+            all(diff(as.numeric(snapshot$summaries$DK2$quarter_today$TimeUTC)) == 900))
+  snapshot$summaries$DK1 <- NULL
   graph <- notification_graph(snapshot)
   stopifnot(file.info(graph)$size > 1000, file.info(graph)$size <= 5 * 1024^2)
   unlink(graph)

@@ -1,5 +1,5 @@
 site_tests <- function() {
-  pages <- c("index.qmd", "east-denmark.qmd", "west-denmark.qmd", "heatpump.qmd", "price-components.qmd")
+  pages <- c("index.qmd", "east-denmark.qmd", "heatpump.qmd", "price-components.qmd")
   stopifnot(all(file.exists(pages)))
   config <- readLines("_quarto.yml", warn = FALSE)
   rendered <- trimws(sub("^- ", "", trimws(config[grepl("^    - .*\\.qmd$", config)])))
@@ -74,10 +74,16 @@ site_plot_tests <- function() {
             diff(daily$data[[4]]$x) == 3600)
   hourly_plot <- ggplot2::ggplot_build(plot_hourly_overview(snapshot, "DK1"))
   stopifnot(hourly_plot$layout$panel_params[[1]]$y.range[1] < -0.4)
-  heat <- plot_heatmap(snapshot)
+  heat <- plot_heatmap(snapshot, "DK1")
   scale <- heat$scales$get_scales("fill")
   stopifnot(identical(tolower(scale$palette(c(0, 1))), c("#062b5c", "#ffffff")))
   ggplot2::ggplot_build(heat)
+  mixed <- snapshot
+  east <- snapshot$heatmap
+  east$PriceArea <- "DK2"
+  mixed$heatmap <- rbind(snapshot$heatmap, east)
+  mixed$summaries$DK2 <- mixed$summaries$DK1
+  stopifnot(all(plot_heatmap(mixed)$data$PriceArea == "DK2"))
   snapshot$summaries$DK1$quarter_today <- quarter[FALSE, ]
   snapshot$heatmap <- snapshot$heatmap[FALSE, ]
   ggplot2::ggplot_build(plot_daily_prices(snapshot, "DK1"))
@@ -86,7 +92,7 @@ site_plot_tests <- function() {
 }
 
 site_rendered_tests <- function(output_dir) {
-  pages <- c("index.html", "east-denmark.html", "west-denmark.html", "heatpump.html", "price-components.html")
+  pages <- c("index.html", "east-denmark.html", "heatpump.html", "price-components.html")
   stopifnot(all(file.exists(file.path(output_dir, pages))))
   for (page in pages) {
     html <- paste(readLines(file.path(output_dir, page), warn = FALSE), collapse = "\n")

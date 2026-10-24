@@ -40,7 +40,7 @@ notification_deliver(body, graph, admitted_date, attempt, record_daily,
   post = function() {
     response <- httr::POST("https://api.pushover.net/1/messages.json",
       body = list(token = app_token, user = user_key, message = body,
-                  title = "Danish electricity prices", attachment = httr::upload_file(graph)),
+                  title = "East Denmark electricity · DK2", attachment = httr::upload_file(graph)),
       encode = "multipart", httr::timeout(30))
     payload <- tryCatch(jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8")),
                         error = function(e) NULL)

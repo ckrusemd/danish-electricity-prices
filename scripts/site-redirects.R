@@ -1,14 +1,15 @@
 # Actual bookdown chapter-heading slugs, plus former source-name links.
 site_redirect_routes <- function() c(
+  "west-denmark.html" = "east-denmark.html",
   "east-denmark-dk2.html" = "east-denmark.html",
-  "west-denmark-dk1.html" = "west-denmark.html",
+  "west-denmark-dk1.html" = "east-denmark.html",
   "heat-pump-operating-frontier.html" = "heatpump.html",
   "københavn-andel-energi-og-radius.html" = "price-components.html",
   "kobenhavn-andel-energi-og-radius.html" = "price-components.html",
   "kbenhavn-andel-energi-og-radius.html" = "price-components.html",
   "aktuelle-pris-komponenter.html" = "price-components.html",
   "EAST.html" = "east-denmark.html",
-  "WEST.html" = "west-denmark.html",
+  "WEST.html" = "east-denmark.html",
   "HEATPUMP.html" = "heatpump.html",
   "PRICE_COMPONENTS.html" = "price-components.html",
   "danish-electricity-prices.html" = "index.html"
@@ -18,7 +19,7 @@ site_write_redirects <- function(output_dir = "_site") {
   routes <- site_redirect_routes()
   targets <- unique(unname(routes))
   if (!dir.exists(output_dir) || !all(file.exists(file.path(output_dir, targets)))) {
-    stop("Render all five Quarto pages before generating compatibility redirects.", call. = FALSE)
+    stop("Render all publication pages before generating compatibility redirects.", call. = FALSE)
   }
   for (alias in names(routes)) {
     target <- routes[[alias]]
